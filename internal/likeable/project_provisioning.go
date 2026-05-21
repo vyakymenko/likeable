@@ -359,8 +359,7 @@ func (s *Server) refreshProjectResources(ctx context.Context, user *User, projec
 		return project, err
 	}
 	if !force {
-		if remaining, ok := s.platformBackoffRemaining(); ok {
-			log.Printf("skip project resource refresh for %s while platform is temporarily unavailable for %s", project.ID, remaining.Round(time.Second))
+		if _, ok := s.platformBackoffRemaining(); ok {
 			return project, nil
 		}
 		key := user.ID + ":" + project.ID + ":resources"

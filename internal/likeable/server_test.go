@@ -428,6 +428,146 @@ func TestMeIncludesGithubConnectionState(t *testing.T) {
 	}
 }
 
+func TestMeUsesConfiguredGithubFallback(t *testing.T) {
+	store, err := store.Open(filepath.Join(t.TempDir(), "likeable.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	server := &Server{store: store, config: RuntimeConfig{BaseURL: "http://example.test"}, http: http.DefaultClient}
+	user, err := store.UpsertUser(t.Context(), "github-fallback@example.com", "GitHub Fallback", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CreateSession(t.Context(), user.ID, "github-fallback-token", time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpsertConfig(t.Context(), map[string]string{
+		"github_username": "fallback-owner",
+		"github_token":    "ghp_secret",
+	}, secretConfigKeys); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	req.AddCookie(&http.Cookie{Name: "likeable_session", Value: "github-fallback-token"})
+	rec := httptest.NewRecorder()
+	server.routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("me returned %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body["githubConnected"] != true || body["githubNeedsReconnect"] != false {
+		t.Fatalf("github state=%v/%v with configured fallback, want connected without reconnect", body["githubConnected"], body["githubNeedsReconnect"])
+	}
+}
+
+func TestGithubExportConnectionPrefersConfiguredFallbackForRepoOnlyOAuth(t *testing.T) {
+	store, err := store.Open(filepath.Join(t.TempDir(), "likeable.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	server := &Server{store: store, config: RuntimeConfig{BaseURL: "http://example.test"}, http: http.DefaultClient}
+	user, err := store.UpsertUser(t.Context(), "github-fallback-export@example.com", "GitHub Export", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpsertSocialConnection(t.Context(), SocialConnection{UserID: user.ID, Provider: "github", ProviderUserID: "repo-only", AccessToken: "oauth-token", Scope: "repo"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpsertConfig(t.Context(), map[string]string{
+		"github_username": "fallback-owner",
+		"github_token":    "fallback-token",
+	}, secretConfigKeys); err != nil {
+		t.Fatal(err)
+	}
+
+	conn, connected, needsReconnect, err := server.githubExportConnection(t.Context(), user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !connected || needsReconnect || conn == nil {
+		t.Fatalf("github fallback state connected=%t needsReconnect=%t conn=%+v, want usable fallback", connected, needsReconnect, conn)
+	}
+	if conn.ProviderUserID != "fallback-owner" || conn.AccessToken != "fallback-token" {
+		t.Fatalf("github fallback conn=%+v, want configured owner/token", conn)
+	}
+}
+
+func TestGithubExportConnectionUsesEnvironmentFallback(t *testing.T) {
+	t.Setenv("GITHUB_USERNAME", "env-owner")
+	t.Setenv("GITHUB_TOKEN", "env-token")
+	store, err := store.Open(filepath.Join(t.TempDir(), "likeable.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	server := &Server{store: store, config: RuntimeConfig{BaseURL: "http://example.test"}, http: http.DefaultClient}
+	user, err := store.UpsertUser(t.Context(), "github-env-export@example.com", "GitHub Env Export", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	conn, connected, needsReconnect, err := server.githubExportConnection(t.Context(), user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !connected || needsReconnect || conn == nil {
+		t.Fatalf("github env fallback state connected=%t needsReconnect=%t conn=%+v, want usable fallback", connected, needsReconnect, conn)
+	}
+	if conn.ProviderUserID != "env-owner" || conn.AccessToken != "env-token" {
+		t.Fatalf("github env fallback conn=%+v, want env owner/token", conn)
+	}
+}
+
+func TestMeFiltersTransientShellNotices(t *testing.T) {
+	store, err := store.Open(filepath.Join(t.TempDir(), "likeable.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	server := &Server{store: store, config: RuntimeConfig{BaseURL: "http://example.test"}, http: http.DefaultClient}
+	user, err := store.UpsertUser(t.Context(), "notices@example.com", "Notice User", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CreateSession(t.Context(), user.ID, "notice-token", time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	if _, err := store.AddUserNotice(t.Context(), UserNotice{UserID: user.ID, Sender: "admin", Severity: "warning", Body: "Please review your account.", CreatedAt: now.Add(-30 * time.Minute).Format(time.RFC3339Nano)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AddUserNotice(t.Context(), UserNotice{UserID: user.ID, Sender: "system", Severity: "warning", Body: "Project deletion started: \"Old app\" and its workspace resources are being removed.", CreatedAt: now.Add(-20 * time.Minute).Format(time.RFC3339Nano)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AddUserNotice(t.Context(), UserNotice{UserID: user.ID, Sender: "system", Severity: "warning", Body: "Project quota: You are using 2/3 project slots. You have one project slot left.", CreatedAt: now.Add(-time.Minute).Format(time.RFC3339Nano)}); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	req.AddCookie(&http.Cookie{Name: "likeable_session", Value: "notice-token"})
+	rec := httptest.NewRecorder()
+	server.routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("me returned %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Notices []UserNotice `json:"notices"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Notices) != 1 || body.Notices[0].Body != "Please review your account." {
+		t.Fatalf("notices=%+v, want only non-transient admin notice", body.Notices)
+	}
+}
+
 func TestMeIncludesOnlyConfiguredBillingProducts(t *testing.T) {
 	store, err := store.Open(filepath.Join(t.TempDir(), "likeable.db"))
 	if err != nil {
@@ -576,6 +716,31 @@ func TestProjectExportRequiresWorkflowGithubScope(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "workflow") {
 		t.Fatalf("export body=%s, want workflow reconnect guidance", rec.Body.String())
+	}
+}
+
+func TestCreateGithubRepoRejectsExistingRepository(t *testing.T) {
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path != "/user/repos" {
+			t.Fatalf("unexpected GitHub path %s", req.URL.Path)
+		}
+		return &http.Response{
+			StatusCode: http.StatusUnprocessableEntity,
+			Status:     "422 Unprocessable Entity",
+			Header:     make(http.Header),
+			Body: io.NopCloser(strings.NewReader(`{
+				"message":"Validation Failed",
+				"errors":[{"resource":"Repository","field":"name","code":"custom","message":"name already exists on this account"}]
+			}`)),
+		}, nil
+	})}
+
+	_, err := createGithubRepo(t.Context(), client, "token", "owner", "existing-repo", true)
+	if !errors.Is(err, errGithubRepoExists) {
+		t.Fatalf("err=%v, want errGithubRepoExists", err)
+	}
+	if got := publicGithubExportError(err); !strings.Contains(got, "already exists") {
+		t.Fatalf("public error=%q, want already-exists guidance", got)
 	}
 }
 
@@ -2293,6 +2458,103 @@ esac
 	}
 }
 
+func TestProjectFeedActivityTimeoutDoesNotBackOffLiveUpdates(t *testing.T) {
+	dir := t.TempDir()
+	cliPath := filepath.Join(dir, "fibe")
+	logPath := filepath.Join(dir, "commands.log")
+	script := `#!/bin/sh
+printf '%s\n' "$*" >> "` + logPath + `"
+case "$*" in
+  *"agents messages"*)
+    echo '{"content":[{"role":"user","body":"build it"}]}'
+    ;;
+  *"agents activity"*)
+    printf '%s\n' '{"error":{"message":"signal: killed","code":"UNKNOWN_ERROR","status":500}}' >&2
+    exit 1
+    ;;
+  *"agents live-state"*)
+    echo '{"conversationId":"conv-feed-activity-timeout","isProcessing":false,"streamText":"","queuedTurns":0}'
+    ;;
+  *)
+    echo "unexpected command: $*" >&2
+    exit 64
+    ;;
+esac
+`
+	if err := os.WriteFile(cliPath, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := store.Open(filepath.Join(t.TempDir(), "likeable.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.UpsertConfig(t.Context(), map[string]string{
+		"fibe_base_url": "server.test:3000",
+		"fibe_api_key":  "test-key",
+		"fibe_cli_path": cliPath,
+	}, secretConfigKeys); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{store: store, config: RuntimeConfig{BaseURL: "http://example.test"}, http: http.DefaultClient}
+	user, _ := store.UpsertUser(t.Context(), "a@example.com", "A", "")
+	if err := store.CreateSession(t.Context(), user.ID, "token-a", time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	project := &Project{
+		ID:             "project-feed-activity-timeout",
+		UserID:         user.ID,
+		Title:          "Activity Timeout",
+		ConversationID: "conv-feed-activity-timeout",
+		AgentID:        "agent-1",
+		PlaygroundID:   "123",
+		PreviewURL:     "http://preview.example.test",
+		Status:         "ready",
+	}
+	if err := store.CreateProject(t.Context(), project); err != nil {
+		t.Fatal(err)
+	}
+
+	for range 2 {
+		req := httptest.NewRequest(http.MethodGet, "/api/projects/project-feed-activity-timeout/feed", nil)
+		req.AddCookie(&http.Cookie{Name: "likeable_session", Value: "token-a"})
+		rec := httptest.NewRecorder()
+		server.routes().ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("feed returned %d, want 200; body=%s", rec.Code, rec.Body.String())
+		}
+		var body struct {
+			Warning  string `json:"warning"`
+			Messages []any  `json:"messages"`
+			Live     struct {
+				ConversationID string `json:"conversationId"`
+			} `json:"live"`
+		}
+		if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.Warning != projectActivityWarning {
+			t.Fatalf("warning=%q, want %q", body.Warning, projectActivityWarning)
+		}
+		if len(body.Messages) != 1 {
+			t.Fatalf("messages=%d, want cached messages despite activity timeout", len(body.Messages))
+		}
+		if body.Live.ConversationID != project.ConversationID {
+			t.Fatalf("live conversation=%q, want %q", body.Live.ConversationID, project.ConversationID)
+		}
+		if remaining, ok := server.platformBackoffRemaining(); ok {
+			t.Fatalf("platform backoff active for %s after activity-only timeout", remaining)
+		}
+	}
+
+	commands := readFile(t, logPath)
+	for _, command := range []string{"agents messages", "agents activity", "agents live-state"} {
+		if got := strings.Count(commands, command); got != 1 {
+			t.Fatalf("%s calls=%d, want 1 cached successful snapshot; commands:\n%s", command, got, commands)
+		}
+	}
+}
+
 func TestProjectNotificationTimingsPersistAcrossRefresh(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "likeable.db")
 	appStore, err := store.Open(dbPath)
@@ -3786,6 +4048,50 @@ func TestIdleProjectStopTaskTreatsAlreadyStoppedAsSuccess(t *testing.T) {
 	}
 }
 
+func TestIdleProjectStopTaskTreatsMissingPlaygroundAsStopped(t *testing.T) {
+	store, err := store.Open(filepath.Join(t.TempDir(), "likeable.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	cliPath, logPath := fakeMissingPlaygroundFibeCLI(t)
+	if err := store.UpsertConfig(t.Context(), map[string]string{
+		"fibe_base_url": "server.test:3000",
+		"fibe_api_key":  "test-key",
+		"fibe_cli_path": cliPath,
+	}, secretConfigKeys); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{store: store, config: RuntimeConfig{BaseURL: "http://example.test"}, http: http.DefaultClient}
+	user, err := store.UpsertUser(t.Context(), "idle-missing@example.com", "Idle", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := &Project{ID: "project-idle-missing", UserID: user.ID, Title: "Idle", ConversationID: "conv-idle-missing", AgentID: "agent-1", PlaygroundID: "playground-missing", Status: "ready", PlaygroundLastUsedAt: time.Now().UTC().Add(-idleProjectStopAfter - time.Minute).Format(time.RFC3339Nano)}
+	if err := store.CreateProject(t.Context(), project); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AddMessageAt(t.Context(), project.ID, "user", "old", time.Now().UTC().Add(-idleProjectStopAfter-time.Minute).Format(time.RFC3339Nano)); err != nil {
+		t.Fatal(err)
+	}
+	payload, _ := json.Marshal(projectJobPayload{UserID: user.ID, UserEmail: user.Email, ProjectID: project.ID})
+
+	if err := server.handleStopIdleProjectTask(t.Context(), asynq.NewTask(taskStopIdleProject, payload)); err != nil {
+		t.Fatal(err)
+	}
+
+	stored, err := store.ProjectForUser(t.Context(), user.ID, project.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Status != "stopped" {
+		t.Fatalf("status=%q, want stopped", stored.Status)
+	}
+	if log := readFile(t, logPath); !strings.Contains(log, "playgrounds stop playground-missing") {
+		t.Fatalf("missing stop command; log=%s", log)
+	}
+}
+
 func TestAgentProjectPromptIncludesTargetContext(t *testing.T) {
 	project := &Project{
 		ID:              "project-1",
@@ -3819,6 +4125,8 @@ func TestAgentProjectPromptIncludesTargetContext(t *testing.T) {
 		"- backend [api,worker]: http://gitea.test/owner/backend",
 		"- app [app]: http://gitea.test/owner/app",
 		"- admin [admin]: http://gitea.test/owner/admin",
+		"Preserve the current product/domain and working behavior unless the user explicitly asks to replace it.",
+		"Run the available build/test/start command after code changes.",
 		"[[LIKEABLE_USER_CONTEXT_START]]",
 		"User request:\nChange the heading",
 		"[[LIKEABLE_USER_CONTEXT_END]]",
@@ -3827,6 +4135,123 @@ func TestAgentProjectPromptIncludesTargetContext(t *testing.T) {
 			t.Fatalf("prompt missing %q:\n%s", want, prompt)
 		}
 	}
+}
+
+func TestPromptImproveUsesAssignedAgent(t *testing.T) {
+	store, err := store.Open(filepath.Join(t.TempDir(), "likeable.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	cliPath, logPath, stdinPath := fakePromptImproveFibeCLI(t)
+	if err := store.UpsertConfig(t.Context(), map[string]string{
+		"fibe_base_url":          "server.test:3000",
+		"fibe_api_key":           "key",
+		"fibe_cli_path":          cliPath,
+		"fibe_agent_server_pool": `[{"agent_id":"agent-1","server_id":"server-1","status":"active"}]`,
+	}, secretConfigKeys); err != nil {
+		t.Fatal(err)
+	}
+	user, err := store.UpsertUser(t.Context(), "pilot@example.com", "Pilot", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CreateSession(t.Context(), user.ID, "prompt-token", time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	project := &Project{ID: "project-prompt-improve", UserID: user.ID, Title: "car sharing webapp", ConversationID: "conv-prompt", AgentID: "agent-1", MarqueeID: "server-1", Status: "ready", PreviewURL: "http://preview.test"}
+	if err := store.CreateProject(t.Context(), project); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{store: store, config: RuntimeConfig{BaseURL: "http://example.test"}, http: http.DefaultClient}
+	req := httptest.NewRequest(http.MethodPost, "/api/projects/project-prompt-improve/prompt-improve", strings.NewReader(`{"text":"add some cars and enhance ux","locale":"uk"}`))
+	req.AddCookie(&http.Cookie{Name: "likeable_session", Value: "prompt-token"})
+	rec := httptest.NewRecorder()
+
+	server.routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("prompt improve returned %d: %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Text   string `json:"text"`
+		Source string `json:"source"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Source != "agent" || !strings.Contains(body.Text, "Improve the existing car sharing webapp") {
+		t.Fatalf("body=%+v, want agent-improved prompt", body)
+	}
+	commands := readFile(t, logPath)
+	for _, want := range []string{
+		"agents create-conversation agent-1 --conversation-id likeable-prompt-improve-",
+		"agents send-message agent-1 --conversation-id likeable-prompt-improve-",
+		"agents messages agent-1 --conversation-id likeable-prompt-improve-",
+		"agents delete-conversation agent-1 --conversation-id likeable-prompt-improve-",
+	} {
+		if !strings.Contains(commands, want) {
+			t.Fatalf("commands missing %q:\n%s", want, commands)
+		}
+	}
+	payload := readFile(t, stdinPath)
+	for _, want := range []string{
+		"You are Likeable's prompt-improvement agent.",
+		"Do not edit files, do not run tools, do not build",
+		"Preferred UI language: Ukrainian",
+		"Current app title: car sharing webapp",
+		`User draft:\nadd some cars and enhance ux`,
+	} {
+		if !strings.Contains(payload, want) {
+			t.Fatalf("prompt payload missing %q:\n%s", want, payload)
+		}
+	}
+}
+
+func TestFallbackImprovedPromptKeepsCyrillicLanguage(t *testing.T) {
+	ru := fallbackImprovedPrompt("добавь машины и улучши ux", "car sharing webapp")
+	if !strings.Contains(ru, "Запрошенное изменение") || !strings.Contains(ru, "car sharing webapp") {
+		t.Fatalf("ru fallback=%q, want Russian prompt with app context", ru)
+	}
+	uk := fallbackImprovedPrompt("add billing polish", "Likeable", "uk")
+	if !strings.Contains(uk, "Запитана зміна") || !strings.Contains(uk, "Likeable") {
+		t.Fatalf("uk fallback=%q, want Ukrainian prompt with app context", uk)
+	}
+	if got := promptImprovePreferredLanguage("uk-UA"); got != "Ukrainian" {
+		t.Fatalf("preferred language=%q, want Ukrainian", got)
+	}
+}
+
+func fakePromptImproveFibeCLI(t *testing.T) (string, string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fibe")
+	logPath := filepath.Join(dir, "commands.log")
+	stdinPath := filepath.Join(dir, "stdin.json")
+	script := `#!/bin/sh
+printf '%s\n' "$*" >> "` + logPath + `"
+case "$*" in
+  *"agents send-message"*)
+    cat > "` + stdinPath + `"
+    echo '{"ok":true}'
+    ;;
+  *"agents messages"*)
+    echo '{"content":[{"role":"assistant","body":"` + promptImproveStart + `\\nImprove the existing car sharing webapp by adding a clear vehicle inventory section, more polished ride/request UX, responsive spacing, empty/loading states, and a quick visual verification pass. Keep the current car sharing product intact and do not replace it with another app.\\n` + promptImproveEnd + `"}]}'
+    ;;
+  *"agents create-conversation"*|*"agents delete-conversation"*)
+    echo '{"ok":true}'
+    ;;
+  *)
+    echo "unexpected command: $*" >&2
+    exit 64
+    ;;
+esac
+`
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return path, logPath, stdinPath
 }
 
 func stringSliceContains(values []string, target string) bool {
@@ -4449,12 +4874,20 @@ func TestPublicAdminConfigExposesSMTPSettings(t *testing.T) {
 		"smtp_port":       "2525",
 		"smtp_from_email": "noreply@example.com",
 		"smtp_password":   "secret",
+		"github_username": "fallback-owner",
+		"github_token":    "ghp_secret",
 	})
 	if entry := cfg["smtp_host"].(map[string]any); entry["value"] != "smtp.example.com" || entry["secret"].(bool) {
 		t.Fatalf("smtp_host entry=%+v, want public value", entry)
 	}
 	if entry := cfg["smtp_password"].(map[string]any); !entry["secret"].(bool) || !entry["set"].(bool) || entry["value"] != "" {
 		t.Fatalf("smtp_password entry=%+v, want write-only secret", entry)
+	}
+	if entry := cfg["github_username"].(map[string]any); entry["value"] != "fallback-owner" || entry["secret"].(bool) {
+		t.Fatalf("github_username entry=%+v, want public fallback owner", entry)
+	}
+	if entry := cfg["github_token"].(map[string]any); !entry["secret"].(bool) || !entry["set"].(bool) || entry["value"] != "" {
+		t.Fatalf("github_token entry=%+v, want write-only secret", entry)
 	}
 }
 

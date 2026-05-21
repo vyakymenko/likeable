@@ -493,6 +493,12 @@ function poolStatusLabel(status: string | undefined, t: (key: TranslationKey) =>
 
 function adminConfigLabel(key: string, t: (key: TranslationKey) => string): string {
   const labelKeys: Record<string, TranslationKey> = {
+    github_client_id: 'admin.config.github_client_id',
+    github_client_secret: 'admin.config.github_client_secret',
+    github_username: 'admin.config.github_username',
+    github_token: 'admin.config.github_token',
+    google_client_id: 'admin.config.google_client_id',
+    google_client_secret: 'admin.config.google_client_secret',
     stripe_publishable_key: 'admin.config.stripe_publishable_key',
     stripe_secret_key: 'admin.config.stripe_secret_key',
     stripe_price_id_1_hour: 'admin.config.stripe_price_id_1_hour',

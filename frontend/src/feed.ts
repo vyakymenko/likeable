@@ -7,6 +7,7 @@ const RECENT_ACTIVITY_WORKING_MS = 15 * 60_000;
 const AGENT_WAITING_HINT_MS = 10_000;
 const AGENT_STALLED_HINT_MS = 90_000;
 const AGENT_STALE_WARNING_MAX_MS = 24 * 60 * 60_000;
+const PROJECT_UPDATE_FALLBACK_GRACE_MS = 15_000;
 
 export type AgentResponseDelayStatus = { phase: 'waiting' | 'stalled'; active: boolean; tone?: 'warning' };
 
@@ -20,7 +21,10 @@ export function feedRows(feed: Feed | null, now = Date.now()): FeedRow[] {
     if (!normalized.body.trim() && normalized.attachments.length === 0) continue;
     rows.push({ kind: 'user', id: msg.id, role: 'user', body: normalized.body, attachments: normalized.attachments, time: msg.createdAt });
   }
-  rows.push(...notificationFeedRows(feed));
+  const notificationRows = notificationFeedRows(feed);
+  rows.push(...notificationRows);
+  const projectUpdateRow = projectUpdateNotificationRow(feed, notificationRows);
+  if (projectUpdateRow) rows.push(projectUpdateRow);
   return applyNotificationTimings(rows.sort(compareFeedRows), feed.notificationTimings, now);
 }
 
@@ -252,6 +256,7 @@ export function feedAwaitingAgent(feed: Feed | null): boolean {
   if (latestUser == null) return false;
   if (feedLiveIdle(feed)) return false;
   if (feedHasAssistantAfterLatestUser(feed)) return false;
+  if (feedProjectUpdatedAfterLatestUser(feed)) return false;
 
   const latestActivity = latestTimestamp((feed.activity ?? []).map(agentActivityTime));
   if (latestActivity != null && latestActivity >= latestUser - TURN_TIME_SLOP_MS) {
@@ -267,6 +272,7 @@ export function agentResponseDelayStatus(feed: Feed | null, now = Date.now()): A
   const latestUser = feedLatestUserTimestamp(feed);
   if (latestUser == null) return null;
   if (feedHasAssistantAfterLatestUser(feed)) return null;
+  if (feedProjectUpdatedAfterLatestUser(feed)) return null;
 
   const age = now - latestUser;
   if (age < AGENT_WAITING_HINT_MS || age > AGENT_STALE_WARNING_MAX_MS) return null;
@@ -298,6 +304,38 @@ export function feedHasAssistantAfterLatestUser(feed: Feed | null): boolean {
     ...(feed.messages ?? []).filter((msg) => msg.role === 'assistant').map(agentMessageTime)
   ]);
   return latestAssistant != null && latestAssistant >= latestUser - TURN_TIME_SLOP_MS;
+}
+
+export function feedProjectUpdatedAfterLatestUser(feed: Feed | null): boolean {
+  const latestUser = feedLatestUserTimestamp(feed);
+  const projectUpdated = feedProjectUpdatedTimestamp(feed);
+  return latestUser != null && projectUpdated != null && projectUpdated >= latestUser + PROJECT_UPDATE_FALLBACK_GRACE_MS;
+}
+
+function feedProjectUpdatedTimestamp(feed: Feed | null): number | null {
+  if (!feed?.project?.updatedAt) return null;
+  const timestamp = Date.parse(feed.project.updatedAt);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function projectUpdateNotificationRow(feed: Feed, notificationRows: NotificationFeedRow[]): NotificationFeedRow | null {
+  const latestUser = feedLatestUserTimestamp(feed);
+  const projectUpdated = feedProjectUpdatedTimestamp(feed);
+  if (latestUser == null || projectUpdated == null || projectUpdated < latestUser + PROJECT_UPDATE_FALLBACK_GRACE_MS) return null;
+  const hasRecentNotification = notificationRows.some((row) => {
+    if (row.active) return true;
+    const rowTime = Date.parse(row.time ?? '');
+    return !Number.isNaN(rowTime) && rowTime >= latestUser - TURN_TIME_SLOP_MS;
+  });
+  if (hasRecentNotification) return null;
+  return {
+    kind: 'notification',
+    id: `project-${feed.project.id}-updated-after-${latestUser}`,
+    body: '',
+    time: feed.project.updatedAt,
+    active: false,
+    fallback: true
+  };
 }
 
 function latestTimestamp(values: Array<string | undefined>): number | null {

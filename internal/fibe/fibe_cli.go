@@ -175,6 +175,18 @@ func IsPlaygroundAlreadyStoppedError(err error) bool {
 	)
 }
 
+func IsPlaygroundMissingError(err error) bool {
+	var platform *PlatformError
+	if !errors.As(err, &platform) {
+		return false
+	}
+	message := strings.ToLower(strings.TrimSpace(platform.Message + "\n" + platform.Stderr))
+	if platform.Status == 404 {
+		return !strings.Contains(message, "conversation") || strings.Contains(message, "playground")
+	}
+	return strings.Contains(message, "playground") && containsAny(message, "not found", "missing")
+}
+
 func (c *Client) runCLI(ctx context.Context, args []string, input any, out any) error {
 	if strings.TrimSpace(c.cliPath) == "" {
 		return &PlatformError{

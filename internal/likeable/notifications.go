@@ -179,7 +179,15 @@ func (s *Server) notifyProjectDeletionScheduled(ctx context.Context, user *User,
 	if user == nil || project == nil {
 		return
 	}
-	body := fmt.Sprintf("Project deletion started: %q and its workspace resources are being removed.", project.Title)
+	prefix := fmt.Sprintf("Project deletion started: %q", project.Title)
+	exists, err := s.store.NoticeExistsSince(ctx, user.ID, "system", prefix, time.Now().UTC().Add(-24*time.Hour))
+	if err == nil && exists {
+		return
+	}
+	if err != nil {
+		log.Printf("project deletion notice dedupe for %s: %v", user.Email, err)
+	}
+	body := prefix + " and its workspace resources are being removed."
 	s.addSystemNoticeAndEmail(ctx, user, "warning", body, "Likeable project deletion started", body)
 }
 

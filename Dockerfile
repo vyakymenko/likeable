@@ -34,9 +34,12 @@ RUN apt-get update \
 RUN useradd --uid 10001 --create-home --home-dir /home/likeable --shell /usr/sbin/nologin likeable && mkdir -p /data && chown -R likeable:likeable /data
 COPY --from=backend /out/likeable /usr/local/bin/likeable
 COPY --from=fibe-cli /usr/local/bin/fibe /usr/local/bin/fibe
+RUN mkdir -p /usr/local/share/likeable
 COPY scripts/install-fibe.sh /usr/local/bin/install-fibe.sh
+COPY scripts/fibe-likeable-wrapper.sh /usr/local/bin/fibe-likeable-wrapper
+COPY scripts/go-fibe-greenfield.yaml /usr/local/share/likeable/go-fibe-greenfield.yaml
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/install-fibe.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/install-fibe.sh /usr/local/bin/fibe-likeable-wrapper /usr/local/bin/docker-entrypoint.sh
 USER likeable
 ENV ADDR=:8080 DATABASE_PATH=/data/likeable.db HOME=/tmp
 EXPOSE 8080

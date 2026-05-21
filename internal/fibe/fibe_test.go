@@ -131,6 +131,21 @@ func TestPlatformErrorPublicProjectErrorKindDoesNotClassifyMirrorLagAsConfigurat
 	}
 }
 
+func TestNewClientUsesEnvCLIPathWhenConfigOmitted(t *testing.T) {
+	t.Setenv("FIBE_CLI_PATH", "/tmp/fibe-wrapper")
+	client, err := NewClient(Config{
+		BaseURL: testFibeBaseURL(),
+		APIKey:  "test",
+		AgentID: "agent",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.cliPath != "/tmp/fibe-wrapper" {
+		t.Fatalf("cliPath=%q, want env wrapper", client.cliPath)
+	}
+}
+
 func TestIsIdempotentConversationCreateError(t *testing.T) {
 	if !IsIdempotentConversationCreateError(&PlatformError{Code: "INTERNAL_ERROR", Status: 422, Message: "conversation already exists"}) {
 		t.Fatal("duplicate/upsert conversation failure should be treated as idempotent")
@@ -152,6 +167,24 @@ func TestIsPlaygroundAlreadyStoppedError(t *testing.T) {
 	}
 	if IsPlaygroundAlreadyStoppedError(&PlatformError{Code: "VALIDATION_FAILED", Status: 422, Message: "Cannot stop playground from current status"}) {
 		t.Fatal("unrelated error code must not be idempotent")
+	}
+}
+
+func TestIsPlaygroundMissingError(t *testing.T) {
+	for _, err := range []error{
+		&PlatformError{Code: "NOT_FOUND", Status: 404, Message: "Playground not found"},
+		&PlatformError{Code: "INTERNAL_ERROR", Status: 404, Message: "unexpected status 404"},
+		&PlatformError{Code: "RESOURCE_NOT_FOUND", Status: 422, Message: "playground is missing"},
+	} {
+		if !IsPlaygroundMissingError(err) {
+			t.Fatalf("IsPlaygroundMissingError(%v)=false, want true", err)
+		}
+	}
+	if IsPlaygroundMissingError(&PlatformError{Code: "NOT_FOUND", Status: 404, Message: "Conversation not found"}) {
+		t.Fatal("generic conversation 404 must not look like a playground miss when message is specific")
+	}
+	if IsPlaygroundMissingError(errors.New("playground not found")) {
+		t.Fatal("plain errors must not look like platform playground misses")
 	}
 }
 
@@ -751,6 +784,64 @@ func TestSendMessagePassesImageAttachmentsInline(t *testing.T) {
 	}
 }
 
+func TestMessagesAndActivityFallBackToRuntimeWhenFibeSyncIsEmpty(t *testing.T) {
+	cliPath, _, _ := fakeFibeCLI(t)
+	runtimeStatusCalls := 0
+	runtime := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/conversations/conv-1/messages":
+			writeJSONResponse(t, w, []map[string]any{
+				{"role": "user", "body": "hello"},
+				{"role": "assistant", "body": "done"},
+			})
+		case "/api/conversations/conv-1/activities":
+			writeJSONResponse(t, w, []map[string]any{
+				{"id": "activity-1", "type": "stream_start"},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer runtime.Close()
+	fibeAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/agents/agent/runtime_status" {
+			http.NotFound(w, r)
+			return
+		}
+		runtimeStatusCalls++
+		if got := r.Header.Get("Authorization"); got != "Bearer test" {
+			t.Fatalf("Authorization=%q, want bearer key", got)
+		}
+		writeJSONResponse(t, w, map[string]any{"chat_url": runtime.URL})
+	}))
+	defer fibeAPI.Close()
+	client := &Client{
+		baseURL:   fibeAPI.URL,
+		apiKey:    "test",
+		agentID:   "agent",
+		cliPath:   cliPath,
+		cliDomain: testFibeCLIDomain(),
+		http:      fibeAPI.Client(),
+	}
+	messages, err := client.Messages(t.Context(), "conv-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 2 || messages[1].(map[string]any)["body"] != "done" {
+		t.Fatalf("messages=%#v, want runtime messages", messages)
+	}
+	activity, err := client.Activity(t.Context(), "conv-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(activity) != 1 || activity[0].(map[string]any)["id"] != "activity-1" {
+		t.Fatalf("activity=%#v, want runtime activity", activity)
+	}
+	if runtimeStatusCalls != 1 {
+		t.Fatalf("runtimeStatusCalls=%d, want cached chat URL", runtimeStatusCalls)
+	}
+}
+
 func TestConversationLiveStateFetchesRuntimeStreamState(t *testing.T) {
 	cliPath, logPath, _ := fakeFibeCLI(t)
 
@@ -1102,6 +1193,14 @@ func readFile(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return string(data)
+}
+
+func writeJSONResponse(t *testing.T, w http.ResponseWriter, value any) {
+	t.Helper()
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(value); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func containsString(values []string, want string) bool {
