@@ -118,6 +118,16 @@ Likeable project context:
 - project repositories:
 %s
 
+[[LIKEABLE_AGENT_CONTRACT_START]]
+Operating contract:
+- Work in the existing target playground/repositories above. Do not create or switch to another playground unless the user explicitly asks for a new app or a reset.
+- Preserve the current product/domain and working behavior unless the user explicitly asks to replace it.
+- For follow-up changes, make the smallest coherent change that satisfies the request, then verify the app still runs.
+- Build a real usable app surface, not a landing page, unless the user asks for a landing page.
+- Keep the UI responsive and production-polished: clear hierarchy, useful empty/loading/error states, no overlapping text or controls.
+- Run the available build/test/start command after code changes. If a provider, key, permission, or workspace issue blocks the work, report the exact blocker instead of silently stopping.
+[[LIKEABLE_AGENT_CONTRACT_END]]
+
 [[LIKEABLE_SYSTEM_CONTEXT_END]]
 [[LIKEABLE_USER_CONTEXT_START]]
 User request:

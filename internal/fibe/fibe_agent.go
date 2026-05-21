@@ -3,9 +3,13 @@ package fibe
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"mime"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -169,7 +173,7 @@ func (c *Client) Messages(ctx context.Context, conversationID string) ([]any, er
 		Content []any `json:"content"`
 	}
 	err := c.runCLI(ctx, []string{"agents", "messages", c.agentID, "--conversation-id", conversationID}, nil, &out)
-	return out.Content, err
+	return c.recordsWithRuntimeFallback(ctx, conversationID, "messages", out.Content, err)
 }
 
 func (c *Client) Activity(ctx context.Context, conversationID string) ([]any, error) {
@@ -177,7 +181,84 @@ func (c *Client) Activity(ctx context.Context, conversationID string) ([]any, er
 		Content []any `json:"content"`
 	}
 	err := c.runCLI(ctx, []string{"agents", "activity", c.agentID, "--conversation-id", conversationID}, nil, &out)
-	return out.Content, err
+	return c.recordsWithRuntimeFallback(ctx, conversationID, "activities", out.Content, err)
+}
+
+func (c *Client) recordsWithRuntimeFallback(ctx context.Context, conversationID, resource string, records []any, cliErr error) ([]any, error) {
+	if cliErr == nil && len(records) > 0 {
+		return records, nil
+	}
+	runtimeRecords, runtimeErr := c.runtimeConversationRecords(ctx, conversationID, resource)
+	if runtimeErr == nil && (len(runtimeRecords) > 0 || cliErr != nil) {
+		return runtimeRecords, nil
+	}
+	return records, cliErr
+}
+
+func (c *Client) runtimeConversationRecords(ctx context.Context, conversationID, resource string) ([]any, error) {
+	conversationID = strings.TrimSpace(conversationID)
+	if conversationID == "" {
+		return nil, errors.New("conversation ID is required")
+	}
+	chatURL, err := c.resolveRuntimeChatURL(ctx)
+	if err != nil {
+		return nil, err
+	}
+	endpoint := strings.TrimRight(chatURL, "/") + "/api/conversations/" + url.PathEscape(conversationID) + "/" + resource
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(res.Body, 512))
+		return nil, fmt.Errorf("runtime %s returned HTTP %d: %s", resource, res.StatusCode, strings.TrimSpace(string(body)))
+	}
+	var out []any
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *Client) resolveRuntimeChatURL(ctx context.Context) (string, error) {
+	if strings.TrimSpace(c.runtimeChatURL) != "" {
+		return c.runtimeChatURL, nil
+	}
+	endpoint := strings.TrimRight(c.baseURL, "/") + "/api/agents/" + url.PathEscape(c.agentID) + "/runtime_status"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	res, err := c.http.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(res.Body, 512))
+		return "", fmt.Errorf("runtime status returned HTTP %d: %s", res.StatusCode, strings.TrimSpace(string(body)))
+	}
+	var out struct {
+		ChatURL    string `json:"chat_url"`
+		ChatURLAlt string `json:"chatUrl"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		return "", err
+	}
+	chatURL := strings.TrimSpace(firstNonEmpty(out.ChatURL, out.ChatURLAlt))
+	if chatURL == "" {
+		return "", errors.New("runtime chat URL is missing")
+	}
+	c.runtimeChatURL = chatURL
+	return chatURL, nil
 }
 
 func (c *Client) ConversationLiveState(ctx context.Context, conversationID string) (*ConversationLiveState, error) {

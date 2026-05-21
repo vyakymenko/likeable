@@ -14,8 +14,9 @@ fi
 
 RUNTIME_FIBE_BIN_DIR="${LIKEABLE_FIBE_BIN_DIR:-${data_dir}/.fibe/bin}"
 RUNTIME_FIBE_BIN="${RUNTIME_FIBE_BIN_DIR}/fibe"
+RUNTIME_FIBE_WRAPPER="${RUNTIME_FIBE_BIN_DIR}/fibe-likeable-wrapper"
+ACTIVE_FIBE_WRAPPER=""
 export PATH="${RUNTIME_FIBE_BIN_DIR}:$PATH"
-export FIBE_CLI_PATH="${FIBE_CLI_PATH:-$RUNTIME_FIBE_BIN}"
 
 fibe_binary_version() {
   binary="$1"
@@ -67,6 +68,7 @@ copy_baked_fibe() {
     return 1
   fi
   echo "[entrypoint] Copying baked fibe from /usr/local/bin/fibe"
+  mkdir -p "$RUNTIME_FIBE_BIN_DIR"
   cp /usr/local/bin/fibe "$RUNTIME_FIBE_BIN"
   chmod +x "$RUNTIME_FIBE_BIN"
 }
@@ -119,7 +121,31 @@ ensure_runtime_fibe() {
   echo "[entrypoint] Runtime fibe ready: ${installed_version}"
 }
 
+sync_runtime_fibe_wrapper() {
+  if [ ! -x /usr/local/bin/fibe-likeable-wrapper ]; then
+    return
+  fi
+  mkdir -p "$RUNTIME_FIBE_BIN_DIR"
+  if cp /usr/local/bin/fibe-likeable-wrapper "$RUNTIME_FIBE_WRAPPER" 2>/dev/null; then
+    chmod +x "$RUNTIME_FIBE_WRAPPER"
+    ACTIVE_FIBE_WRAPPER="$RUNTIME_FIBE_WRAPPER"
+  elif [ -x "$RUNTIME_FIBE_WRAPPER" ] && cmp -s /usr/local/bin/fibe-likeable-wrapper "$RUNTIME_FIBE_WRAPPER"; then
+    ACTIVE_FIBE_WRAPPER="$RUNTIME_FIBE_WRAPPER"
+  else
+    echo "[entrypoint] Could not update runtime fibe wrapper; using baked wrapper" >&2
+    ACTIVE_FIBE_WRAPPER="/usr/local/bin/fibe-likeable-wrapper"
+  fi
+}
+
 ensure_runtime_fibe
+sync_runtime_fibe_wrapper
+
+if [ -z "${FIBE_CLI_PATH:-}" ] && [ -n "$ACTIVE_FIBE_WRAPPER" ] && [ -x "$ACTIVE_FIBE_WRAPPER" ]; then
+  export FIBE_REAL_CLI="$RUNTIME_FIBE_BIN"
+  export FIBE_CLI_PATH="$ACTIVE_FIBE_WRAPPER"
+else
+  export FIBE_CLI_PATH="${FIBE_CLI_PATH:-$RUNTIME_FIBE_BIN}"
+fi
 
 if [ "$#" -eq 0 ]; then
   set -- likeable

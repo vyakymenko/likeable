@@ -11,6 +11,7 @@ export function ProjectList({ projects, activeID, projectCap, busy, exportingID,
   const [draftTitle, setDraftTitle] = useState('');
   const [menuID, setMenuID] = useState('');
   const quotaProjectCount = projects.filter((project) => project.status !== 'archived' && project.status !== 'deleting').length;
+  const capReached = projectCap != null && quotaProjectCount >= projectCap;
   const projectCountLabel = projectCap == null
     ? t(quotaProjectCount === 1 ? 'projects.count.one' : 'projects.count.many', { count: quotaProjectCount })
     : t('projects.count.cap', { count: quotaProjectCount, cap: projectCap });
@@ -38,6 +39,24 @@ export function ProjectList({ projects, activeID, projectCap, busy, exportingID,
   const canStartPlayground = (project: Project) => project.status === 'stopped';
   const canStopPlayground = (project: Project) => project.status === 'ready';
   const canRestartPlayground = (project: Project) => project.status === 'ready';
+  const projectRuntimeState = (project: Project) => {
+    if (controllingID === project.id) return t('projects.actions.working');
+    switch (project.status) {
+      case 'ready':
+        return t('projects.actions.ready');
+      case 'stopped':
+        return t('projects.actions.paused');
+      case 'creating':
+      case 'launching':
+        return t('projects.actions.starting');
+      case 'error':
+        return t('projects.actions.error');
+      case 'archived':
+        return t('projects.actions.archived');
+      default:
+        return statusLabel(project.status, t);
+    }
+  };
   const projectRowMeta = (project: Project) => {
     const serviceCount = project.services?.length ?? 0;
     const updatedTime = formatMessageTime(project.updatedAt, locale);
@@ -45,18 +64,37 @@ export function ProjectList({ projects, activeID, projectCap, busy, exportingID,
       ? t('projects.rowMeta.updated', { services: serviceCount, time: updatedTime })
       : t('projects.rowMeta.servicesOnly', { services: serviceCount });
   };
+  const projectRowDetail = (project: Project) => {
+    switch (project.status) {
+      case 'creating':
+      case 'launching':
+        return t('projects.rowDetail.starting');
+      case 'error':
+        return project.errorMessage?.trim() || t('projects.rowDetail.error');
+      case 'stopped':
+        return t('projects.rowDetail.stopped');
+      case 'archived':
+        return t('projects.rowDetail.archived');
+      default:
+        return '';
+    }
+  };
   return (
     <div className="projectList">
       <div className="inlinePanelHeader projectPanelHeader">
         <div>
           <span className="eyebrow">{t('projects.title')}</span>
           <strong>{projectCountLabel}</strong>
+          {capReached && <small className="projectPanelLimit"><CircleAlert size={12} /> {t('projects.quotaFull')}</small>}
         </div>
         <button className="projectDelete" onClick={onClose} aria-label={t('projects.close')}><X size={15} /></button>
       </div>
-      <div className="projectRows">
-        {projects.map((project) => (
-          <div key={project.id} className={`projectRow ${project.id === activeID ? 'selected' : ''}`}>
+      <div className={menuID ? 'projectRows menuOpen' : 'projectRows'}>
+        {projects.map((project, index) => {
+          const detail = projectRowDetail(project);
+          const menuOpensUp = index > 0;
+          return (
+          <div key={project.id} className={`projectRow ${project.id === activeID ? 'selected' : ''} ${menuID === project.id ? 'menuActive' : ''}`}>
             {editingID === project.id ? (
               <form className="projectTitleEdit" onSubmit={(event) => { event.preventDefault(); void saveTitle(project); }}>
                 <input
@@ -87,6 +125,7 @@ export function ProjectList({ projects, activeID, projectCap, busy, exportingID,
                     {project.id === activeID && <strong className="projectCurrentBadge">{t('service.current')}</strong>}
                   </span>
                   <small className="projectSelectMeta">{projectRowMeta(project)}</small>
+                  {detail && <small className={`projectSelectDetail ${project.status}`}>{detail}</small>}
                 </button>
                 <em className={`projectStatusChip ${project.status}`}>{statusLabel(project.status, t)}</em>
                 <div className="projectRowActions">
@@ -114,10 +153,14 @@ export function ProjectList({ projects, activeID, projectCap, busy, exportingID,
                       {controllingID === project.id ? <Loader2 className="spinIcon" size={14} /> : <MoreHorizontal size={16} />}
                     </button>
                     {menuID === project.id && (
-                      <div className="projectActionMenu" role="menu">
-                        <button role="menuitem" disabled={busy || !canStartPlayground(project)} onClick={() => void runPlaygroundAction(project, 'start')}><Play size={14} /> {t('projects.start')}</button>
-                        <button role="menuitem" disabled={busy || !canStopPlayground(project)} onClick={() => void runPlaygroundAction(project, 'stop')}><Square size={13} /> {t('projects.stop')}</button>
-                        <button role="menuitem" disabled={busy || !canRestartPlayground(project)} onClick={() => void runPlaygroundAction(project, 'restart')}><RotateCcw size={14} /> {t('projects.restart')}</button>
+                      <div className={`projectActionMenu ${menuOpensUp ? 'openUp' : ''}`} role="menu">
+                        <div className="projectActionMenuHeader" role="presentation">
+                          <span>{t('projects.actions.runtime')}</span>
+                          <strong>{projectRuntimeState(project)}</strong>
+                        </div>
+                        <button role="menuitem" disabled={busy || !canStartPlayground(project)} onClick={() => void runPlaygroundAction(project, 'start')}><Play size={14} /> <span>{t('projects.start')}</span></button>
+                        <button role="menuitem" disabled={busy || !canStopPlayground(project)} onClick={() => void runPlaygroundAction(project, 'stop')}><Square size={13} /> <span>{t('projects.stop')}</span></button>
+                        <button role="menuitem" disabled={busy || !canRestartPlayground(project)} onClick={() => void runPlaygroundAction(project, 'restart')}><RotateCcw size={14} /> <span>{t('projects.restart')}</span></button>
                       </div>
                     )}
                   </div>
@@ -125,9 +168,13 @@ export function ProjectList({ projects, activeID, projectCap, busy, exportingID,
               </>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
-      <button className="newProjectRow" onClick={onNew}><Plus size={15} /> {t('projects.new')}</button>
+      <button className={capReached ? 'newProjectRow disabled' : 'newProjectRow'} onClick={onNew} disabled={capReached || busy}>
+        {capReached ? <CircleAlert size={15} /> : <Plus size={15} />}
+        {capReached ? t('projects.quotaFull') : t('projects.new')}
+      </button>
     </div>
   );
 }
@@ -150,9 +197,17 @@ export function HelpPanel({ markdown, onClose }: { markdown: string; onClose: ()
 
 export function ServicePanel({ services, selectedName, busy, onSelect, onClose }: { services: ProjectService[]; selectedName?: string; busy: boolean; onSelect: (service: ProjectService) => void; onClose: () => void }) {
   const { t } = useI18n();
+  const serviceCountLabel = t(services.length === 1 ? 'service.count.one' : 'service.count.many', { count: services.length });
   const serviceMeta = (service: ProjectService) => {
-    const visibility = service.visibility || (!service.authRequired ? t('service.public') : '');
-    return [service.type, visibility, service.authRequired ? t('service.authRequired') : ''].filter(Boolean).join(' · ');
+    return [service.type].filter(Boolean).join(' · ');
+  };
+  const serviceHost = (service: ProjectService) => {
+    if (!service.url) return '';
+    try {
+      return new URL(service.url).host;
+    } catch {
+      return service.url.replace(/^https?:\/\//, '').split('/')[0] ?? '';
+    }
   };
   return (
     <section className="inlinePanel serviceInline">
@@ -160,29 +215,37 @@ export function ServicePanel({ services, selectedName, busy, onSelect, onClose }
         <div>
           <span className="eyebrow">{t('service.preview')}</span>
           <strong>{selectedName ? t('service.selector', { name: selectedName }) : t('service.menu')}</strong>
+          <small className="inlinePanelSubcopy">{serviceCountLabel}</small>
         </div>
         <button className="projectDelete" onClick={onClose} aria-label={t('service.close')}><X size={15} /></button>
       </div>
       <div className="serviceRows" role="radiogroup" aria-label={t('service.menu')}>
-        {services.map((service) => (
-          <button
-            key={service.name}
-            className={service.name === selectedName ? 'serviceOption selected' : 'serviceOption'}
-            disabled={busy}
-            role="radio"
-            aria-checked={service.name === selectedName}
-            onClick={() => onSelect(service)}
-          >
-            <span className="serviceOptionLead">
-              <span className={`serviceOptionDot ${service.name === selectedName ? 'selected' : ''}`} aria-hidden="true" />
-              <span className="serviceOptionCopy">
-                <span>{service.name}</span>
-                <small>{serviceMeta(service)}</small>
+        {services.map((service) => {
+          const selected = service.name === selectedName;
+          const host = serviceHost(service);
+          const meta = serviceMeta(service);
+          return (
+            <button
+              key={service.name}
+              className={selected ? 'serviceOption selected' : 'serviceOption'}
+              disabled={busy}
+              role="radio"
+              aria-checked={selected}
+              aria-label={t('service.show', { name: service.name })}
+              onClick={() => onSelect(service)}
+            >
+              <span className="serviceOptionLead">
+                <span className={`serviceOptionDot ${selected ? 'selected' : ''}`} aria-hidden="true" />
+                <span className="serviceOptionCopy">
+                  <span>{service.name}</span>
+                  {meta && <small>{meta}</small>}
+                  {host && <small className="serviceOptionUrl">{host}</small>}
+                </span>
               </span>
-            </span>
-            {service.name === selectedName && <em>{t('service.current')}</em>}
-          </button>
-        ))}
+              <em className={selected ? 'current' : service.authRequired ? 'locked' : ''}>{selected ? t('service.current') : service.authRequired ? t('service.authRequired') : t('service.public')}</em>
+            </button>
+          );
+        })}
       </div>
     </section>
   );
@@ -451,7 +514,7 @@ export function AgentNotificationRow({ body, active, elapsedMs, elapsedStartedAt
 export function EmptyCanvas({ title, body }: { title?: string; body?: string } = {}) {
   const { t } = useI18n();
   return (
-    <div className="emptyPreview">
+    <div className="emptyPreview" aria-live="polite">
       <CanvasFrameDecor />
       <div className="emptyCopy">
         <h1>{title ?? t('empty.awaitingTitle')}</h1>
@@ -463,7 +526,7 @@ export function EmptyCanvas({ title, body }: { title?: string; body?: string } =
 
 export function CanvasLoader({ title, body, tone }: { title: string; body: string; tone?: 'error' }) {
   return (
-    <div className={`emptyPreview canvasLoader ${tone === 'error' ? 'error' : ''}`}>
+    <div className={`emptyPreview canvasLoader ${tone === 'error' ? 'error' : ''}`} role="status" aria-live="polite" aria-busy={tone === 'error' ? undefined : true}>
       <CanvasFrameDecor loading />
       <div className="loaderRing" />
       <div className="loaderTelemetry" aria-hidden="true">
@@ -706,12 +769,22 @@ export function ConfirmNewProject({ projectCap, projectCount, busy, onCancel, on
         <button className="dialogClose" onClick={onCancel} aria-label={t('dialog.close')}><X size={16} /></button>
         <span className="eyebrow">{t('newProject.eyebrow')}</span>
         <h2 id="new-project-title">{t('newProject.title')}</h2>
-        <p>{t('newProject.body')}</p>
-        <label className="dialogField">
-          <span>{t('builder.project.name')}</span>
-          <input className="dialogInput" value={title} maxLength={80} onChange={(event) => setTitle(event.target.value)} placeholder={t('newProject.placeholder', { number: projectCount + 1 })} />
-        </label>
-        {projectCap != null && <p className="quotaLine">{t('newProject.quota', { count: projectCount, cap: projectCap })}</p>}
+        <p>{t(capReached ? 'newProject.capReachedBody' : 'newProject.body')}</p>
+        {capReached ? (
+          <div className="dialogNotice warning">
+            <CircleAlert size={16} />
+            <span>
+              <strong>{t('newProject.capReached')}</strong>
+              <small>{t('newProject.capReachedAction')}</small>
+            </span>
+          </div>
+        ) : (
+          <label className="dialogField">
+            <span>{t('builder.project.name')}</span>
+            <input className="dialogInput" value={title} maxLength={80} onChange={(event) => setTitle(event.target.value)} placeholder={t('newProject.placeholder', { number: projectCount + 1 })} />
+          </label>
+        )}
+        {projectCap != null && <p className={`quotaLine ${capReached ? 'warning' : ''}`}>{t('newProject.quota', { count: projectCount, cap: projectCap })}</p>}
         <div className="dialogActions">
           <button className="ghostButton" onClick={onCancel}>{t('common.cancel')}</button>
           <button className="primaryButton" disabled={busy || capReached} onClick={() => onConfirm(title)}>
@@ -726,12 +799,20 @@ export function ConfirmNewProject({ projectCap, projectCount, busy, onCancel, on
 
 export function ConfirmDeleteProject({ project, busy, onCancel, onConfirm }: { project: Project; busy: boolean; onCancel: () => void; onConfirm: () => void }) {
   const { t } = useI18n();
+  const initial = (project.title.trim()[0] || 'L').toUpperCase();
   return (
     <div className="modalScrim">
       <section className="confirmDialog deleteProjectDialog" role="dialog" aria-modal="true" aria-labelledby="delete-project-title">
         <button className="dialogClose" disabled={busy} onClick={onCancel} aria-label={t('dialog.close')}><X size={16} /></button>
         <span className="eyebrow">{t('deleteProject.eyebrow')}</span>
         <h2 id="delete-project-title">{t('deleteProject.title')}</h2>
+        <div className="dialogProjectSummary danger">
+          <span className={`projectRowMark ${project.status}`} aria-hidden="true">{initial}</span>
+          <span>
+            <strong>{project.title}</strong>
+            <small>{statusLabel(project.status, t)}</small>
+          </span>
+        </div>
         <p>{t('deleteProject.body', { title: project.title })}</p>
         <div className="dialogActions">
           <button className="ghostButton" onClick={onCancel}>{t('common.cancel')}</button>
@@ -752,6 +833,7 @@ export function ConfirmExportProject({ project, busy, busyMode, githubConnected,
   const cleanName = repoName.trim();
   const valid = /^[A-Za-z0-9._-]{1,100}$/.test(cleanName);
   const archived = project.status === 'archived';
+  const initial = (project.title.trim()[0] || 'L').toUpperCase();
   const githubLabel = !githubConnected ? t('exportProject.connectGithub') : githubNeedsReconnect ? t('exportProject.reconnectGithub') : t('exportProject.exportGithub');
   return (
     <div className="modalScrim">
@@ -759,7 +841,18 @@ export function ConfirmExportProject({ project, busy, busyMode, githubConnected,
         <button className="dialogClose" disabled={busy} onClick={onCancel} aria-label={t('dialog.close')}><X size={16} /></button>
         <span className="eyebrow">{t('exportProject.eyebrow')}</span>
         <h2 id="export-project-title">{t('exportProject.title')}</h2>
+        <div className="dialogProjectSummary">
+          <span className={`projectRowMark ${project.status}`} aria-hidden="true">{initial}</span>
+          <span>
+            <strong>{project.title}</strong>
+            <small>{statusLabel(project.status, t)}</small>
+          </span>
+        </div>
         <p>{t(archived ? 'exportProject.archivedBody' : 'exportProject.body', { title: project.title })}</p>
+        <div className="dialogExportModes" aria-hidden="true">
+          <span><Download size={14} /> {t('exportProject.zipHint')}</span>
+          {!archived && <span><GitBranch size={14} /> {t(githubNeedsReconnect ? 'exportProject.githubReconnectHint' : 'exportProject.githubHint')}</span>}
+        </div>
         {!archived && (
           <>
             <label className="dialogField">

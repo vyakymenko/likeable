@@ -197,17 +197,13 @@ func (s *Server) refreshProjectFeedFull(ctx context.Context, fibeClient *fibegat
 	if _, ok := s.platformBackoffRemaining(); !ok {
 		activity, activityErr := fibeClient.Activity(ctx, project.ConversationID)
 		if activityErr != nil {
-			s.observePlatformError(activityErr)
 			if fibegateway.IsConversationMissingError(activityErr) {
 				activity = []any{}
 			} else {
 				log.Printf("load project feed activity for project %s: %v", project.ID, activityErr)
-				warnings = append(warnings, warningForProjectFeedError(activityErr, projectActivityWarning))
-				if isPlatformBackoffError(activityErr) {
-					snapshot.messages = sanitizeAgentProtocolMessages(messages)
-					snapshot.warning = joinWarnings(warnings)
-					return
-				}
+				// Activity is durable history, not the live control plane. Keep messages/live moving
+				// when this optional endpoint is slow or times out.
+				warnings = append(warnings, projectActivityWarning)
 				activity = snapshot.activity
 			}
 		} else {

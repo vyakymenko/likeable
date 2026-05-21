@@ -336,7 +336,16 @@ func (s *Server) enqueueDeferredProjectProvisionRetry(ctx context.Context, paylo
 	if delay <= 0 {
 		delay = projectProvisionRetryDelay
 	}
-	err := s.enqueueProjectJob(ctx, taskProvisionProject, payload, asynq.Queue(projectProvisionQueue), asynq.MaxRetry(6), asynq.Timeout(15*time.Minute), asynq.ProcessIn(delay), asynq.Unique(projectProvisionUniqueTTL))
+	data, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("encode deferred project provisioning retry %s: %v", payload.ProjectID, err)
+		return false
+	}
+	_, err = s.jobs.client.EnqueueContext(ctx, asynq.NewTask(taskProvisionProject, data), asynq.Queue(projectProvisionQueue), asynq.MaxRetry(6), asynq.Timeout(15*time.Minute), asynq.ProcessIn(delay), asynq.Unique(projectProvisionUniqueTTL))
+	if errors.Is(err, asynq.ErrDuplicateTask) {
+		log.Printf("deferred project provisioning retry %s was already queued", payload.ProjectID)
+		return false
+	}
 	if err != nil {
 		log.Printf("enqueue deferred project provisioning retry %s: %v", payload.ProjectID, err)
 		return false
@@ -555,7 +564,9 @@ func (s *Server) handleArchiveDeleteProjectTask(ctx context.Context, task *asynq
 	if err != nil {
 		return err
 	}
-	if conn, err := s.store.SocialConnection(ctx, user.ID, "github"); err == nil {
+	if conn, connected, needsReconnect, err := s.githubExportConnection(ctx, user.ID); err != nil {
+		log.Printf("archive project %s github export credential lookup failed: %v", project.ID, err)
+	} else if connected && !needsReconnect && conn != nil {
 		repoName := projecttext.SourceName(project.Title) + "-archive-" + strings.ReplaceAll(project.ID[:min(len(project.ID), 8)], "-", "")
 		if repoURL, err := s.exportProjectToGithub(ctx, user, project, conn, repoName, true); err == nil {
 			archive.GithubRepoURL = repoURL

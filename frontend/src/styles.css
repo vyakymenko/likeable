@@ -604,6 +604,7 @@ html[data-builder-mode="split"] .account {
   width: 100%;
   height: 100%;
   border: 0;
+  border-radius: 0;
   background: white;
   display: block;
   opacity: 0;
@@ -1740,6 +1741,11 @@ html[data-builder-mode="split"] .account {
   align-content: start;
   gap: 7px;
 }
+.projectRows.menuOpen {
+  position: relative;
+  z-index: 40;
+  overflow: visible;
+}
 .chatPane.screenOpen .projectList,
 .chatPane.screenOpen .inlinePanel {
   min-height: 0;
@@ -1753,8 +1759,12 @@ html[data-builder-mode="split"] .account {
   overflow-y: auto;
   overflow-x: hidden;
 }
+.chatPane.screenOpen .projectRows.menuOpen {
+  overflow: visible;
+}
 .projectRow,
 .newProjectRow {
+  position: relative;
   border: 1px solid rgba(199, 137, 45, .22);
   background: rgba(255, 255, 255, .025);
   color: var(--text);
@@ -1766,6 +1776,9 @@ html[data-builder-mode="split"] .account {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
+}
+.projectRow.menuActive {
+  z-index: 45;
 }
 .projectSelect,
 .projectDelete {
@@ -1829,12 +1842,44 @@ html[data-builder-mode="split"] .account {
   z-index: 35;
   width: min(340px, calc(var(--app-viewport-width, 100vw) - 22px));
   display: grid;
-  gap: 2px;
+  gap: 4px;
   border: 1px solid rgba(223, 154, 47, .42);
   border-radius: 8px;
   background: rgba(5, 11, 14, .98);
   box-shadow: 0 18px 44px rgba(0, 0, 0, .45);
   padding: 5px;
+}
+.projectActionMenu.openUp {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+.projectActionMenuHeader {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px 8px;
+  border-bottom: 1px solid rgba(160, 177, 184, .12);
+}
+.projectActionMenuHeader span,
+.projectActionMenuHeader strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.projectActionMenuHeader span {
+  color: rgba(163, 176, 183, .62);
+  font-size: .65rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.projectActionMenuHeader strong {
+  color: rgba(242, 214, 166, .9);
+  font-size: .72rem;
+  font-weight: 800;
 }
 .projectActionMenu button {
   width: 100%;
@@ -1845,7 +1890,8 @@ html[data-builder-mode="split"] .account {
   background: transparent;
   color: rgba(216, 228, 231, .76);
   cursor: pointer;
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
   align-items: center;
   gap: 9px;
   justify-content: flex-start;
@@ -1858,6 +1904,11 @@ html[data-builder-mode="split"] .account {
 .projectActionMenu button svg {
   flex: 0 0 auto;
 }
+.projectActionMenu button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .projectActionMenu button:hover {
   color: var(--amber);
   background: rgba(213, 141, 45, .1);
@@ -1865,6 +1916,10 @@ html[data-builder-mode="split"] .account {
 .projectActionMenu button:disabled {
   opacity: .45;
   cursor: not-allowed;
+}
+.projectActionMenu button:disabled:hover {
+  color: rgba(216, 228, 231, .76);
+  background: transparent;
 }
 .projectTitleEdit {
   flex: 1 1 auto;
@@ -1958,6 +2013,18 @@ html[data-builder-mode="split"] .account {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.inlinePanelSubcopy {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(174, 244, 255, .58);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
 .profileInlineBody {
   display: flex;
   align-items: center;
@@ -1989,10 +2056,20 @@ html[data-builder-mode="split"] .account {
   white-space: nowrap;
 }
 .helpInline {
+  grid-template-rows: auto;
+  grid-auto-rows: auto;
+  align-content: start;
   gap: 12px;
+  overflow: auto;
 }
+
+.chatPane.screenOpen .helpInline {
+  overflow: auto;
+}
+
 .helpMarkdown {
   min-width: 0;
+  width: 100%;
   display: grid;
   gap: 10px;
   color: rgba(216, 228, 231, .7);
@@ -4169,7 +4246,7 @@ html.draggingCollapsedChat * {
     touch-action: pan-y;
   }
   .builder.overlay .previewContent > iframe {
-    border-radius: 8px;
+    border-radius: 0;
     overflow: hidden;
   }
   .previewPane.chatExpanded {
@@ -4898,8 +4975,8 @@ body {
 }
 
 .previewPane iframe {
-  border-radius: 14px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, .32);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .overlayChat:not(.collapsed):not(.minimized) {
@@ -5389,6 +5466,25 @@ body {
   border-color: rgba(232, 181, 111, .24);
   background: rgba(232, 181, 111, .08);
   color: var(--amber-bright);
+}
+
+.composerModeHint.pending {
+  border-color: rgba(232, 181, 111, .24);
+  background: rgba(232, 181, 111, .075);
+  color: var(--warn);
+}
+
+.composerModeHint.error {
+  border-color: rgba(255, 122, 122, .26);
+  background: rgba(255, 122, 122, .075);
+  color: var(--danger);
+}
+
+.composerModeHint.paused,
+.composerModeHint.blocked {
+  border-color: rgba(174, 245, 255, .12);
+  background: rgba(174, 245, 255, .04);
+  color: var(--text-secondary);
 }
 
 .composer .attachButton {
@@ -5936,6 +6032,58 @@ body {
   white-space: nowrap;
 }
 
+.projectPanelHeader > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.projectPanelLimit {
+  min-width: 0;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid rgba(232, 181, 111, .22);
+  border-radius: 999px;
+  background: rgba(232, 181, 111, .08);
+  color: var(--warn);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  font-size: 10.5px;
+  font-weight: 760;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectSelectDetail {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 560;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectSelectDetail.creating,
+.projectSelectDetail.launching {
+  color: var(--warn);
+}
+
+.projectSelectDetail.error {
+  color: var(--danger);
+}
+
+.projectSelectDetail.archived,
+.projectSelectDetail.stopped {
+  color: var(--text-tertiary);
+}
+
 .projectRows em.projectStatusChip {
   margin-left: auto;
   min-height: 24px;
@@ -6013,6 +6161,14 @@ body {
   padding: 6px;
 }
 
+.projectActionMenuHeader {
+  border-bottom-color: var(--border-muted);
+}
+
+.projectActionMenuHeader strong {
+  color: var(--amber-bright);
+}
+
 .projectActionMenu button {
   border-radius: 9px;
   color: var(--text-secondary);
@@ -6021,6 +6177,13 @@ body {
 .projectActionMenu button:hover {
   color: var(--amber-bright);
   background: rgba(212, 149, 60, .1);
+}
+
+.projectActionMenu button:disabled,
+.projectActionMenu button:disabled:hover {
+  color: var(--text-muted);
+  background: transparent;
+  opacity: .5;
 }
 
 .serviceOption {
@@ -6089,15 +6252,35 @@ body {
   white-space: nowrap;
 }
 
+.serviceOptionCopy .serviceOptionUrl {
+  color: rgba(174, 245, 255, .62);
+  font-size: 10.5px;
+  font-weight: 620;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .serviceOption em {
   min-height: 22px;
   border: 1px solid rgba(94, 212, 168, .2);
   border-radius: 999px;
-  background: rgba(94, 212, 168, .08);
-  color: var(--ok);
+  background: rgba(174, 245, 255, .07);
+  color: var(--cyan-dim);
   display: inline-flex;
   align-items: center;
   padding: 0 8px;
+}
+
+.serviceOption em.current {
+  border-color: rgba(94, 212, 168, .2);
+  background: rgba(94, 212, 168, .08);
+  color: var(--ok);
+}
+
+.serviceOption em.locked {
+  border-color: rgba(232, 181, 111, .22);
+  background: rgba(232, 181, 111, .08);
+  color: var(--warn);
 }
 
 .newProjectRow {
@@ -6321,6 +6504,113 @@ body {
   background: rgba(4, 10, 13, .92);
 }
 
+.dialogNotice,
+.dialogProjectSummary,
+.dialogExportModes {
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background:
+    linear-gradient(90deg, rgba(174, 245, 255, .035), transparent),
+    rgba(8, 18, 24, .56);
+}
+
+.dialogNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 14px 0 10px;
+  padding: 11px 12px;
+  color: var(--text-secondary);
+}
+
+.dialogNotice svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.dialogNotice > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.dialogNotice strong,
+.dialogProjectSummary strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 730;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dialogNotice small,
+.dialogProjectSummary small {
+  color: var(--text-tertiary);
+  font-size: 11.5px;
+  font-weight: 610;
+  line-height: 1.35;
+}
+
+.dialogNotice.warning {
+  border-color: rgba(232, 181, 111, .24);
+  background:
+    linear-gradient(90deg, rgba(232, 181, 111, .1), transparent),
+    rgba(8, 18, 24, .64);
+  color: var(--warn);
+}
+
+.dialogProjectSummary {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 10px 11px;
+}
+
+.dialogProjectSummary .projectRowMark {
+  width: 32px;
+  height: 32px;
+}
+
+.dialogProjectSummary > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.dialogProjectSummary.danger {
+  border-color: rgba(255, 122, 122, .22);
+  background:
+    linear-gradient(90deg, rgba(255, 122, 122, .08), transparent),
+    rgba(8, 18, 24, .58);
+}
+
+.dialogExportModes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 12px 0 2px;
+  padding: 8px;
+}
+
+.dialogExportModes span {
+  min-height: 28px;
+  border: 1px solid rgba(174, 245, 255, .1);
+  border-radius: 999px;
+  background: rgba(4, 10, 13, .48);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  font-size: 11.5px;
+  font-weight: 720;
+}
+
 .dialogCheck {
   min-height: 38px;
   border: 1px solid var(--border-subtle);
@@ -6335,6 +6625,10 @@ body {
   border-radius: 999px;
   background: rgba(232, 181, 111, .08);
   padding: 5px 9px;
+}
+
+.quotaLine.warning {
+  color: var(--warn) !important;
 }
 
 .dialogActions {
@@ -6544,5 +6838,2359 @@ body {
 
   .primaryButton.onboardingStart {
     min-height: 34px;
+  }
+}
+
+/* ============================================
+   LIKEABLE V2.1 - chat surface pass
+   ============================================ */
+:root {
+  --bg-hover: rgba(212, 149, 60, .06);
+  --bg-active: rgba(212, 149, 60, .1);
+  --amber-dim: #a06c27;
+  --cyan-glow: rgba(174, 245, 255, .28);
+  --ok-bg: rgba(94, 212, 168, .12);
+  --warn-bg: rgba(232, 181, 111, .12);
+  --danger-bg: rgba(255, 122, 122, .1);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.overlayChat:not(.collapsed):not(.minimized) {
+  width: min(920px, calc(100vw - 56px));
+  height: var(--basic-chat-height, min(58dvh, 640px));
+  min-height: min(340px, calc(var(--app-viewport-height, 100dvh) - 32px));
+}
+
+.overlayChat .chatPane {
+  overflow: hidden;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(14, 27, 34, .92), rgba(5, 11, 15, .98)),
+    var(--bg-surface);
+  box-shadow:
+    0 28px 74px rgba(0, 0, 0, .62),
+    0 0 0 1px rgba(174, 245, 255, .04),
+    inset 0 1px 0 rgba(255, 255, 255, .035);
+}
+
+.overlayChat .chatPane::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 16% 0%, rgba(174, 245, 255, .06), transparent 30%),
+    linear-gradient(90deg, rgba(174, 245, 255, .025), transparent 24%, transparent 76%, rgba(212, 149, 60, .025));
+  opacity: .8;
+}
+
+.overlayChat .chatPane > * {
+  position: relative;
+  z-index: 1;
+}
+
+.chatPane.agentActive {
+  border-color: rgba(174, 245, 255, .28);
+  box-shadow:
+    0 28px 74px rgba(0, 0, 0, .62),
+    0 0 0 1px rgba(174, 245, 255, .08),
+    0 0 34px rgba(174, 245, 255, .065);
+}
+
+.poweredBy {
+  min-height: 19px;
+  padding: 3px 12px 2px;
+  border-bottom: 1px solid var(--border-hairline);
+  background: rgba(3, 8, 11, .42);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 650;
+  letter-spacing: .14em;
+}
+
+.poweredBy span {
+  color: var(--amber-bright);
+  font-weight: 800;
+}
+
+.basicChatChrome {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-hairline);
+  background:
+    linear-gradient(180deg, rgba(9, 20, 26, .72), rgba(6, 13, 17, .52)),
+    rgba(5, 11, 14, .62);
+}
+
+.chatBrand {
+  width: 34px;
+  height: 34px;
+}
+
+.basicChatChrome .projectTitleControl {
+  min-height: 38px;
+  padding: 4px 6px 4px 8px;
+  border: 1px solid rgba(174, 245, 255, .08);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(18, 32, 41, .64), rgba(8, 16, 22, .38)),
+    rgba(5, 12, 16, .58);
+}
+
+.basicChatChrome .projectTitleControl:hover,
+.basicChatChrome .projectTitleControl:focus-within {
+  border-color: rgba(212, 149, 60, .24);
+  background:
+    linear-gradient(90deg, rgba(212, 149, 60, .07), rgba(174, 245, 255, .035)),
+    rgba(6, 14, 18, .68);
+}
+
+.projectTitleButton .projectTitleMain {
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 680;
+  letter-spacing: 0;
+}
+
+.projectTitleSub {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 720;
+  letter-spacing: .09em;
+}
+
+.serviceSelectorButton.serviceSelectorInTitle,
+.projectTitleCount,
+.projectExternalLink {
+  min-height: 28px;
+  border: 1px solid rgba(212, 149, 60, .22);
+  border-radius: 999px;
+  background: rgba(4, 10, 13, .46);
+  color: var(--text-secondary);
+}
+
+.serviceSelectorButton.serviceSelectorInTitle {
+  padding: 0 9px 0 10px;
+}
+
+.serviceSelectorButton .serviceSelectorName {
+  max-width: min(17vw, 128px);
+}
+
+.serviceSelectorButton.serviceSelectorInTitle:hover,
+.serviceSelectorButton.serviceSelectorInTitle.selected,
+.projectTitleCount:hover,
+.projectExternalLink:hover {
+  border-color: var(--border-default);
+  background: var(--bg-active);
+  color: var(--amber-bright);
+}
+
+.chatNav {
+  align-items: center;
+  gap: 6px;
+}
+
+.chromePill {
+  min-height: 34px;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border-hairline);
+  border-radius: 11px;
+  background: rgba(5, 12, 16, .42);
+}
+
+.chromePill .chromeIconButton,
+.chromeIconButton,
+.chatNav button {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  border-radius: 8px;
+}
+
+.chromePill .chromeIconButton.languageChromeButton {
+  min-width: 42px;
+  height: 30px;
+}
+
+.chatNav button:hover,
+.chromeIconButton:hover,
+.chromeIconButton.selected {
+  color: var(--amber-bright);
+  background: rgba(212, 149, 60, .1);
+  box-shadow: none;
+}
+
+.studioNowStrip {
+  min-height: 46px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-hairline);
+  background:
+    linear-gradient(90deg, rgba(94, 212, 168, .055), transparent 34%),
+    rgba(3, 9, 12, .48);
+}
+
+.studioNowStatus {
+  min-height: 26px;
+  padding: 0 10px;
+  border-color: rgba(94, 212, 168, .2);
+  background: rgba(94, 212, 168, .08);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+.studioNowStatus strong {
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.studioNextEyebrow {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 760;
+  letter-spacing: .16em;
+}
+
+.studioNextAction {
+  min-height: 30px;
+  border-radius: 10px;
+  padding: 0 12px 0 10px;
+  background: rgba(212, 149, 60, .1);
+  font-size: 12px;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.studioNextAction span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.messages {
+  padding: 14px;
+  gap: 10px;
+  background:
+    linear-gradient(180deg, rgba(4, 10, 13, .16), rgba(3, 8, 11, .52)),
+    transparent;
+  scrollbar-color: rgba(212, 149, 60, .28) transparent;
+}
+
+.messageCard {
+  align-self: flex-end;
+  display: grid;
+  gap: 6px;
+  max-width: min(76%, 680px);
+  padding: 9px 12px 10px;
+  border: 1px solid rgba(212, 149, 60, .28);
+  border-right: 2px solid rgba(232, 181, 111, .54);
+  border-radius: 12px 12px 5px 12px;
+  background:
+    linear-gradient(180deg, rgba(212, 149, 60, .13), rgba(212, 149, 60, .07)),
+    rgba(8, 14, 16, .72);
+}
+
+.messageMeta {
+  justify-self: end;
+  width: fit-content;
+  gap: 7px;
+  border: 0;
+  background: transparent;
+  color: var(--amber-bright);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 820;
+  letter-spacing: .1em;
+  padding: 0;
+}
+
+.messageMeta time {
+  color: var(--text-tertiary);
+}
+
+.messageCard .messageBody,
+.messageBody {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 540;
+  line-height: 1.46;
+}
+
+.notificationRow {
+  align-self: flex-start;
+  max-width: min(640px, 92%);
+  padding-left: 0;
+}
+
+.notificationBubble {
+  max-width: 100%;
+  min-height: 36px;
+  grid-template-columns: 22px 16px minmax(0, 1fr);
+  gap: 8px;
+  border-radius: 10px;
+  padding: 7px 11px 7px 8px;
+}
+
+.notificationText {
+  font-size: 12.5px;
+  font-weight: 680;
+}
+
+.composer {
+  grid-template-columns: 46px minmax(0, 1fr) 46px;
+  gap: 8px;
+  align-items: start;
+  margin: 12px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(8, 18, 24, .96), rgba(4, 9, 12, .99)),
+    var(--bg-inset);
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, .24),
+    inset 0 1px 0 rgba(255, 255, 255, .035);
+}
+
+.chatPane.hasDraft .composer,
+.composer:focus-within {
+  border-color: rgba(232, 181, 111, .36);
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, .24),
+    0 0 0 1px rgba(232, 181, 111, .08),
+    inset 0 1px 0 rgba(255, 255, 255, .035);
+}
+
+.composerTextSlot {
+  align-items: start;
+}
+
+.composer textarea {
+  min-height: 46px;
+  max-height: 164px;
+  border: 1px solid rgba(174, 245, 255, .09);
+  border-radius: 12px;
+  padding: 12px max(76px, 5rem) 12px 14px;
+  background:
+    radial-gradient(circle at 100% 50%, rgba(174, 245, 255, .04), transparent 34%),
+    rgba(3, 9, 12, .9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035);
+  font-size: 14px;
+  font-weight: 560;
+}
+
+.composer textarea::placeholder {
+  color: rgba(141, 153, 163, .78);
+}
+
+.composer textarea:focus {
+  border-color: rgba(232, 181, 111, .72);
+  box-shadow:
+    0 0 0 4px rgba(212, 149, 60, .08),
+    inset 0 1px 0 rgba(255, 255, 255, .04);
+}
+
+.composer .attachButton,
+.composer .sendButton,
+.overlayChat .composer .attachButton,
+.overlayChat .composer .sendButton {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  min-height: 46px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: rgba(18, 32, 41, .62);
+}
+
+.composer .attachButton {
+  color: var(--text-secondary);
+}
+
+.composer .sendButton {
+  border-color: var(--border-default);
+  background:
+    linear-gradient(180deg, rgba(232, 181, 111, .24), rgba(212, 149, 60, .15)),
+    rgba(8, 18, 24, .78);
+  color: var(--amber-bright);
+}
+
+.composer .attachButton:not(:disabled):hover,
+.overlayChat .composer .attachButton:not(:disabled):hover {
+  border-color: var(--border-default);
+  background: rgba(212, 149, 60, .08);
+  color: var(--amber-bright);
+}
+
+.composer .sendButton:not(:disabled):hover,
+.overlayChat .composer .sendButton:not(:disabled):hover {
+  border-color: var(--border-strong);
+  background:
+    linear-gradient(180deg, rgba(232, 181, 111, .34), rgba(212, 149, 60, .2)),
+    rgba(10, 22, 28, .86);
+}
+
+.composerPromptTools {
+  grid-column: 2 / 4;
+  margin-top: 0;
+  padding: 4px;
+  border: 1px solid var(--border-hairline);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(18, 32, 41, .54), rgba(7, 14, 18, .38)),
+    rgba(4, 10, 13, .5);
+}
+
+.composerPromptTools button {
+  min-height: 28px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.composerModeHint {
+  min-height: 28px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 760;
+  letter-spacing: .08em;
+}
+
+.composerQuotaBadge {
+  right: 10px;
+  min-height: 22px;
+  border-color: rgba(174, 245, 255, .16);
+  background: rgba(5, 12, 16, .76);
+  color: var(--text-secondary);
+}
+
+.attachmentTray {
+  grid-column: 1 / -1;
+}
+
+/* ============================================
+   LIKEABLE V2.10 - composer stability pass
+   ============================================ */
+.composer {
+  grid-template-columns: 46px minmax(0, 1fr) 46px;
+}
+
+.attachmentTray {
+  display: grid;
+  grid-template-columns: auto repeat(auto-fit, minmax(min(190px, 100%), 1fr));
+  align-items: center;
+  gap: 6px;
+  max-height: 112px;
+  overflow-y: auto;
+}
+
+.attachmentTrayCount {
+  min-height: 30px;
+  border: 1px solid rgba(232, 181, 111, .22);
+  border-radius: 10px;
+  background: rgba(232, 181, 111, .08);
+  color: var(--amber-bright);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 9px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 820;
+  letter-spacing: .06em;
+  white-space: nowrap;
+}
+
+.attachmentChip {
+  width: 100%;
+  max-width: none;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 24px;
+  align-items: center;
+}
+
+.attachmentChip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composerPromptTools {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(92px, auto)) minmax(0, 1fr);
+}
+
+.composerModeHint {
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .attachmentTray {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .attachmentChip {
+    grid-column: 1 / -1;
+  }
+
+  .composerPromptTools {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .composerModeHint {
+    grid-column: 1 / -1;
+    justify-content: center;
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 430px) {
+  .composer {
+    grid-template-columns: 42px minmax(0, 1fr) 42px;
+    margin: 8px;
+    padding: 7px;
+  }
+
+  .composer .attachButton,
+  .composer .sendButton,
+  .overlayChat .composer .attachButton,
+  .overlayChat .composer .sendButton {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    min-height: 42px;
+  }
+
+  .composerPromptTools button {
+    min-height: 30px;
+    padding: 0 5px;
+  }
+}
+
+@media (max-width: 920px) {
+  .overlayChat:not(.collapsed):not(.minimized) {
+    width: 100%;
+    min-height: 0;
+  }
+
+  .overlayChat:not(.collapsed):not(.minimized) .chatPane {
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "powered"
+      "projectTitle"
+      "status"
+      "messages"
+      "composer";
+    border-radius: 18px 18px 0 0;
+  }
+
+  .overlayChat:not(.collapsed):not(.minimized) .chatPane > .basicChatChrome {
+    display: none;
+  }
+
+  .overlayChat:not(.collapsed):not(.minimized) .chatProjectTitle {
+    display: inline-flex;
+    width: 100%;
+    margin: 0;
+    padding: 9px 10px;
+    border-width: 0 0 1px;
+    border-radius: 0;
+    background: rgba(7, 14, 17, .58);
+  }
+
+  .studioNowStrip {
+    min-height: 42px;
+    padding: 7px 12px;
+  }
+
+  .studioNextAction span {
+    max-width: 34vw;
+  }
+
+  .notificationRow {
+    max-width: 100%;
+  }
+
+  .messageCard {
+    max-width: 92%;
+  }
+
+  .composer {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    margin: 9px;
+    padding: 8px;
+  }
+
+  .composer .attachButton,
+  .composer .sendButton,
+  .overlayChat .composer .attachButton,
+  .overlayChat .composer .sendButton {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .composerPromptTools {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .poweredBy {
+    min-height: 18px;
+    font-size: 8.5px;
+  }
+
+  .studioNowStatus {
+    max-width: 100%;
+  }
+
+  .studioNextAction {
+    padding: 0 9px;
+  }
+
+  .studioNextAction span {
+    display: none;
+  }
+
+  .messages {
+    padding: 10px 9px;
+  }
+
+  .composer textarea {
+    min-height: 44px;
+    padding: 12px max(62px, 4.25rem) 12px 12px;
+    font-size: 14px;
+  }
+
+  .composerPromptTools {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .composerPromptTools button {
+    padding: 0 6px;
+  }
+}
+
+/* ============================================
+   LIKEABLE V2.2 - utility panel pass
+   ============================================ */
+.chatPane.screenOpen {
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-areas:
+    "powered"
+    "projectTitle"
+    "chrome"
+    "projects";
+}
+
+.chatPane.screenOpen .projectList,
+.chatPane.screenOpen .inlinePanel {
+  min-height: 0;
+  border-bottom: 0;
+  overflow: hidden;
+}
+
+.projectList,
+.inlinePanel {
+  gap: 12px;
+  padding: 14px;
+  border-top: 1px solid var(--border-hairline);
+  background:
+    radial-gradient(circle at 16% -10%, rgba(174, 245, 255, .075), transparent 34%),
+    linear-gradient(180deg, rgba(12, 24, 31, .88), rgba(5, 11, 15, .96));
+}
+
+.inlinePanel {
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+  overflow: auto;
+  scrollbar-color: rgba(212, 149, 60, .32) transparent;
+  scrollbar-width: thin;
+}
+
+.projectList .inlinePanelHeader,
+.inlinePanelHeader {
+  min-height: 48px;
+  margin: -14px -14px 0;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--border-hairline);
+  background:
+    linear-gradient(180deg, rgba(9, 20, 26, .82), rgba(6, 13, 17, .46)),
+    rgba(4, 10, 13, .58);
+}
+
+.inlinePanelHeader > div {
+  min-width: 0;
+}
+
+.inlinePanelHeader .eyebrow {
+  color: var(--amber-bright);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 820;
+  letter-spacing: .16em;
+}
+
+.inlinePanelHeader strong {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.inlinePanelHeader > .projectDelete {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: rgba(18, 32, 41, .62);
+  color: var(--text-secondary);
+}
+
+.inlinePanelHeader > .projectDelete:hover {
+  border-color: var(--border-default);
+  background: rgba(212, 149, 60, .1);
+  color: var(--amber-bright);
+}
+
+.projectRows,
+.serviceRows {
+  gap: 8px;
+  min-height: 0;
+  max-height: none;
+  padding-right: 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-color: rgba(212, 149, 60, .32) transparent;
+  scrollbar-width: thin;
+}
+
+.projectRows.menuOpen {
+  overflow: visible;
+}
+.chatPane.screenOpen .projectRows.menuOpen {
+  overflow: visible;
+}
+
+.projectRow {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 60px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border-color: var(--border-subtle);
+  background:
+    linear-gradient(90deg, rgba(174, 245, 255, .025), transparent 46%),
+    rgba(8, 18, 24, .7);
+}
+
+.projectRow:hover,
+.projectRow:focus-within {
+  border-color: var(--border-default);
+  background:
+    linear-gradient(90deg, rgba(212, 149, 60, .095), rgba(174, 245, 255, .035)),
+    rgba(10, 22, 28, .82);
+}
+
+.projectRow.selected {
+  border-color: var(--border-strong);
+  background:
+    linear-gradient(90deg, rgba(212, 149, 60, .14), rgba(94, 212, 168, .045)),
+    rgba(10, 20, 26, .88);
+}
+
+.projectRowMark {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 8px;
+}
+
+.projectSelect {
+  min-width: 0;
+  width: 100%;
+}
+
+.projectRows em.projectStatusChip {
+  justify-self: end;
+  margin-left: 0;
+}
+
+.projectRow > .projectRowActions {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  opacity: .72;
+  transition: opacity .15s ease;
+}
+
+.projectRow:hover > .projectRowActions,
+.projectRow:focus-within > .projectRowActions {
+  opacity: 1;
+}
+
+.projectRowIcon,
+.projectDelete {
+  border-radius: 9px;
+}
+
+.projectTitleEdit {
+  grid-column: 1 / -1;
+}
+
+.newProjectRow {
+  width: 100%;
+  min-height: 44px;
+  justify-content: center;
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(212, 149, 60, .045), rgba(174, 245, 255, .025)),
+    transparent;
+}
+
+.newProjectRow.disabled {
+  cursor: not-allowed;
+  border-color: rgba(232, 181, 111, .22);
+  background: rgba(232, 181, 111, .055);
+  color: rgba(232, 181, 111, .74);
+  opacity: .86;
+}
+
+.projectList .newProjectRow.disabled {
+  display: none;
+}
+
+.projectTitleCount .quotaFull {
+  color: var(--warn);
+}
+
+.serviceOption {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  border-radius: 12px;
+  border-color: var(--border-subtle);
+  background:
+    linear-gradient(90deg, rgba(174, 245, 255, .025), transparent 46%),
+    rgba(8, 18, 24, .7);
+}
+
+.serviceOption.selected {
+  border-color: var(--border-strong);
+  background:
+    linear-gradient(90deg, rgba(212, 149, 60, .14), rgba(94, 212, 168, .045)),
+    rgba(10, 20, 26, .88);
+}
+
+.serviceOptionLead {
+  min-width: 0;
+}
+
+.helpMarkdown {
+  gap: 12px;
+  max-width: 760px;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  font-weight: 560;
+}
+
+.helpInline {
+  grid-template-rows: auto;
+  grid-auto-rows: auto;
+  align-content: start;
+  overflow: auto;
+}
+
+.chatPane.screenOpen .helpInline {
+  overflow: auto;
+}
+
+.helpMarkdown h1,
+.helpMarkdown h2,
+.helpMarkdown h3 {
+  color: var(--text-primary);
+  letter-spacing: 0;
+}
+
+.helpMarkdown code {
+  border: 1px solid var(--border-hairline);
+  border-radius: 6px;
+  background: rgba(5, 12, 16, .72);
+  color: var(--amber-bright);
+}
+
+.helpMarkdown details {
+  border-color: var(--border-subtle);
+  border-radius: 12px;
+  background: rgba(8, 18, 24, .66);
+}
+
+.profileInline {
+  align-content: start;
+}
+
+.profileGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.profileCard {
+  min-height: 78px;
+  border-radius: 12px;
+  border-color: var(--border-subtle);
+  background:
+    linear-gradient(120deg, rgba(212, 149, 60, .06), rgba(174, 245, 255, .025)),
+    rgba(8, 18, 24, .68);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
+}
+
+.profileIdentityCard,
+.profileHoursCard,
+.profileSlotsCard,
+.profileDangerCard {
+  grid-column: 1 / -1;
+}
+
+.profileCard strong,
+.profileCard em {
+  white-space: normal;
+}
+
+.profileQuotaReadout span {
+  color: var(--amber-bright);
+  text-shadow: 0 0 20px rgba(212, 149, 60, .18);
+}
+
+.profileMeter {
+  background: rgba(5, 12, 16, .78);
+}
+
+.profileMeter span {
+  background: linear-gradient(90deg, var(--amber), var(--amber-bright));
+}
+
+@media (max-width: 920px) {
+  .chatPane.screenOpen {
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      "powered"
+      "projectTitle"
+      "projects";
+  }
+
+  .projectList,
+  .inlinePanel {
+    padding: 12px;
+  }
+
+  .projectList .inlinePanelHeader,
+  .inlinePanelHeader {
+    margin: -12px -12px 0;
+    padding: 11px 12px 9px;
+  }
+
+  .projectRow {
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+  }
+
+  .projectRows em.projectStatusChip {
+    display: none;
+  }
+
+  .profileGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .projectRow {
+    grid-template-columns: 30px minmax(0, 1fr);
+    align-items: start;
+    min-height: 88px;
+    gap: 8px 10px;
+  }
+
+  .projectRowMark {
+    order: 0;
+    margin-top: 1px;
+  }
+
+  .projectSelect {
+    order: 0;
+  }
+
+  .projectRows .projectRow > .projectStatusChip {
+    display: inline-flex;
+    grid-column: 2;
+    order: 0;
+    justify-self: start;
+    margin-left: 0;
+  }
+
+  .projectRow > .projectRowActions {
+    grid-column: 2;
+    justify-self: start;
+    opacity: 1;
+  }
+
+  .serviceOption {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .serviceOption em {
+    justify-self: start;
+    margin-left: 18px;
+  }
+}
+
+/* ============================================
+   LIKEABLE V2.3 - status hygiene pass
+   ============================================ */
+.noticeStack {
+  top: calc(10px + env(safe-area-inset-top));
+  width: min(760px, calc(100vw - 32px));
+  gap: 6px;
+}
+
+.systemNotice {
+  min-height: 42px;
+  grid-template-columns: auto minmax(0, 1fr) 28px;
+  gap: 9px;
+  border-radius: 14px;
+  padding: 7px 7px 7px 12px;
+  background:
+    linear-gradient(90deg, rgba(18, 32, 41, .9), rgba(5, 12, 15, .94)),
+    rgba(5, 12, 15, .92);
+  box-shadow:
+    0 18px 46px rgba(0, 0, 0, .34),
+    inset 0 1px 0 rgba(255, 255, 255, .04);
+}
+
+.systemNotice.warning {
+  border-color: rgba(232, 181, 111, .34);
+  background:
+    linear-gradient(90deg, rgba(232, 181, 111, .12), rgba(18, 32, 41, .86) 42%, rgba(5, 12, 15, .94)),
+    rgba(5, 12, 15, .92);
+}
+
+.systemNotice.danger {
+  border-color: rgba(255, 122, 122, .42);
+}
+
+.systemNotice strong {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border: 1px solid rgba(232, 181, 111, .22);
+  border-radius: 8px;
+  background: rgba(4, 10, 13, .46);
+  color: var(--amber-bright);
+  font-size: 9.5px;
+  letter-spacing: .13em;
+}
+
+.systemNotice span {
+  font-size: 12.5px;
+  line-height: 1.3;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.systemNotice button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(174, 245, 255, .08);
+  border-radius: 9px;
+  background: rgba(4, 10, 13, .45);
+}
+
+.systemNotice button:hover {
+  border-color: rgba(232, 181, 111, .24);
+  background: rgba(232, 181, 111, .1);
+  color: var(--amber-bright);
+}
+
+.notificationRow:not(.active):not(.warning) .notificationBubble {
+  border-color: rgba(94, 212, 168, .28);
+  background:
+    linear-gradient(90deg, rgba(94, 212, 168, .12), rgba(174, 245, 255, .035)),
+    rgba(6, 18, 18, .78);
+}
+
+.notificationDone {
+  color: rgba(94, 212, 168, .96);
+}
+
+.notificationRow.warning .notificationBubble {
+  border-color: rgba(232, 181, 111, .24);
+  background:
+    linear-gradient(90deg, rgba(232, 181, 111, .1), rgba(18, 32, 41, .08)),
+    rgba(14, 11, 8, .72);
+}
+
+.notificationRow.warning .notificationText {
+  color: rgba(255, 225, 188, .88);
+}
+
+.notificationElapsed {
+  letter-spacing: 0;
+}
+
+@media (max-width: 560px) {
+  .noticeStack {
+    top: calc(8px + env(safe-area-inset-top));
+    width: calc(100vw - 18px);
+  }
+
+  .systemNotice {
+    grid-template-columns: minmax(0, 1fr) 28px;
+    padding-left: 10px;
+  }
+
+  .systemNotice strong {
+    display: none;
+  }
+
+  .systemNotice span {
+    font-size: 12px;
+  }
+}
+
+/* ============================================
+   LIKEABLE V2.4 - canvas and dialog pass
+   ============================================ */
+.previewPane {
+  background:
+    linear-gradient(180deg, rgba(6, 14, 17, .96), rgba(2, 5, 7, .99)),
+    #030709;
+}
+
+.previewContent::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(174, 245, 255, .024) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(174, 245, 255, .02) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: .28;
+}
+
+.previewPane iframe,
+.previewContent > .emptyPreview {
+  position: relative;
+  z-index: 1;
+}
+
+.previewContent > .onboardingGallery {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.previewPane iframe.loaded {
+  box-shadow: none;
+}
+
+.emptyPreview {
+  background:
+    radial-gradient(circle at 18% 20%, rgba(174, 245, 255, .11), transparent 30%),
+    radial-gradient(circle at 82% 78%, rgba(212, 149, 60, .09), transparent 34%),
+    linear-gradient(rgba(174, 245, 255, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(174, 245, 255, .027) 1px, transparent 1px),
+    linear-gradient(180deg, #0b171d 0%, #03080b 62%, #050b0e 100%);
+  background-size: auto, auto, 28px 28px, 28px 28px, auto;
+}
+
+.emptyPreview::before {
+  height: 42%;
+  background:
+    linear-gradient(rgba(174, 245, 255, .12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 181, 111, .1) 1px, transparent 1px);
+  background-size: 56px 56px;
+  opacity: .34;
+  mask-image: linear-gradient(180deg, transparent 0%, #000 24%, #000 100%);
+}
+
+.emptyPreview::after {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border: 1px solid rgba(174, 245, 255, .065);
+  border-radius: 18px;
+  pointer-events: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
+}
+
+.stars {
+  opacity: .34;
+}
+
+.reticle {
+  top: 18%;
+  left: max(28px, 7%);
+  opacity: .48;
+}
+
+.canvasSignalField {
+  inset: 13% max(32px, 8%) auto auto;
+  transform: scale(.96);
+  transform-origin: top right;
+  opacity: .36;
+}
+
+.canvasHorizon {
+  inset: auto 10% 13%;
+  opacity: .54;
+}
+
+.loaderRing {
+  width: 84px;
+  height: 84px;
+  border-color: rgba(232, 181, 111, .14);
+  border-top-color: rgba(174, 245, 255, .82);
+  border-right-color: rgba(94, 212, 168, .42);
+  background: rgba(3, 9, 12, .48);
+  box-shadow:
+    0 0 0 1px rgba(174, 245, 255, .04),
+    0 0 44px rgba(174, 245, 255, .11),
+    inset 0 0 22px rgba(174, 245, 255, .035);
+}
+
+.loaderRing::after {
+  content: "";
+  position: absolute;
+  inset: 13px;
+  border: 1px solid rgba(174, 245, 255, .1);
+  border-radius: inherit;
+}
+
+.loaderTelemetry {
+  top: calc(50% + 66px);
+  width: min(260px, 54vw);
+  opacity: .56;
+}
+
+.loaderTelemetry span {
+  background: linear-gradient(90deg, transparent, rgba(94, 212, 168, .62), rgba(232, 181, 111, .5), transparent);
+}
+
+.emptyCopy {
+  width: min(700px, calc(100vw - 56px));
+  padding: 0 18px;
+}
+
+.emptyCopy h1 {
+  color: var(--text-primary);
+  font-size: clamp(30px, 4.2vw, 56px);
+  font-weight: 680;
+  letter-spacing: 0;
+  text-shadow: 0 0 30px rgba(174, 245, 255, .18);
+}
+
+.canvasLoader .emptyCopy h1 {
+  font-size: clamp(26px, 3.4vw, 44px);
+}
+
+.emptyCopy p {
+  max-width: 560px;
+  color: var(--text-secondary);
+  font-size: 14.5px;
+  font-weight: 610;
+}
+
+.canvasStatus {
+  min-height: 32px;
+  border-color: rgba(174, 245, 255, .14);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(18, 32, 41, .8), rgba(4, 10, 13, .76)),
+    rgba(4, 10, 13, .78);
+  backdrop-filter: blur(14px);
+  letter-spacing: .1em;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, .26);
+}
+
+.canvasStatus.working {
+  border-color: rgba(94, 212, 168, .28);
+  background:
+    linear-gradient(90deg, rgba(94, 212, 168, .12), rgba(174, 245, 255, .055)),
+    rgba(5, 17, 18, .82);
+}
+
+.dropOverlay {
+  inset: 54px 14px 94px;
+  border-radius: 16px;
+  border-color: rgba(174, 245, 255, .42);
+  background:
+    linear-gradient(135deg, rgba(4, 10, 13, .9), rgba(18, 32, 41, .82)),
+    rgba(2, 8, 10, .84);
+  color: var(--text-primary);
+  box-shadow:
+    0 18px 52px rgba(0, 0, 0, .36),
+    inset 0 1px 0 rgba(255, 255, 255, .035);
+}
+
+.dropOverlay svg {
+  color: var(--cyan);
+}
+
+.modalScrim {
+  background:
+    radial-gradient(circle at 50% 46%, rgba(174, 245, 255, .09), transparent 32%),
+    radial-gradient(circle at 74% 22%, rgba(232, 181, 111, .09), transparent 28%),
+    rgba(1, 4, 7, .72);
+}
+
+.confirmDialog {
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.confirmDialog:not(.deleteProjectDialog)::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(174, 245, 255, .34), rgba(232, 181, 111, .26), transparent);
+  pointer-events: none;
+}
+
+.confirmDialog .dialogClose {
+  right: 12px;
+  top: 12px;
+  border-radius: 10px;
+}
+
+.confirmDialog h2 {
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+.dialogField {
+  gap: 8px;
+}
+
+.dialogCheck {
+  border-radius: 12px;
+}
+
+.dialogActions {
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.dialogActions .ghostButton,
+.dialogActions .primaryButton,
+.dialogActions .dangerButton {
+  border-radius: 10px;
+  padding: 9px 13px;
+}
+
+@media (max-width: 920px) {
+  .emptyPreview::after {
+    inset: 10px;
+    border-radius: 14px;
+  }
+
+  .reticle {
+    left: 22px;
+    top: 17%;
+  }
+
+  .canvasSignalField {
+    right: 20px;
+    width: min(46vw, 240px);
+    transform: scale(.78);
+  }
+
+  .emptyCopy {
+    width: min(620px, calc(100vw - 28px));
+    padding: 0 12px;
+  }
+}
+
+@media (max-width: 560px) {
+  .emptyPreview::after {
+    inset: 8px;
+  }
+
+  .loaderRing {
+    width: 70px;
+    height: 70px;
+  }
+
+  .loaderTelemetry {
+    top: calc(50% + 58px);
+    width: min(220px, 68vw);
+  }
+
+  .emptyCopy h1,
+  .canvasLoader .emptyCopy h1 {
+    font-size: 28px;
+    line-height: 1.08;
+  }
+
+  .emptyCopy p {
+    font-size: 13.5px;
+  }
+
+  .dropOverlay {
+    inset: 46px 9px 92px;
+    border-radius: 13px;
+  }
+}
+
+/* ============================================
+   LIKEABLE V2.5 - profile and account pass
+   ============================================ */
+.profileInline {
+  grid-template-rows: auto;
+  grid-auto-rows: auto;
+  align-content: start;
+  gap: 12px;
+  overflow: auto;
+  padding-bottom: 16px;
+}
+
+.chatPane.screenOpen .profileInline {
+  overflow: auto;
+}
+
+.profileInline .inlinePanelHeader {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.profileGrid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.profileCard {
+  position: relative;
+  min-height: 82px;
+  border-radius: 12px;
+  border-color: rgba(174, 245, 255, .11);
+  border-left: 1px solid rgba(232, 181, 111, .24);
+  background:
+    linear-gradient(135deg, rgba(174, 245, 255, .035), transparent 46%),
+    linear-gradient(180deg, rgba(13, 26, 33, .78), rgba(6, 13, 17, .82));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .03),
+    0 14px 34px rgba(0, 0, 0, .18);
+}
+
+.profileCard::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  border-radius: 12px 0 0 12px;
+  background: linear-gradient(180deg, rgba(232, 181, 111, .68), rgba(94, 212, 168, .18));
+  opacity: .72;
+}
+
+.profileIdentityCard {
+  grid-column: span 7;
+  min-height: 98px;
+}
+
+.profileActionCard {
+  grid-column: span 5;
+  align-items: center;
+  gap: 14px;
+}
+
+.profileActionCard:not(.profileHoursCard):not(.profileSlotsCard):not(.profileDangerCard) {
+  min-height: 88px;
+}
+
+.profileHoursCard,
+.profileSlotsCard,
+.profileDangerCard {
+  grid-column: 1 / -1;
+}
+
+.profileHoursCard,
+.profileSlotsCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 14px;
+  min-height: 132px;
+}
+
+.profileDangerCard {
+  border-color: rgba(255, 122, 122, .24);
+  background:
+    linear-gradient(135deg, rgba(255, 122, 122, .06), rgba(174, 245, 255, .02) 48%, transparent),
+    rgba(14, 12, 11, .72);
+}
+
+.profileDangerCard::before {
+  background: linear-gradient(180deg, rgba(255, 122, 122, .76), rgba(232, 181, 111, .28));
+}
+
+.profileAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .22), 0 14px 26px rgba(212, 149, 60, .16);
+}
+
+.profileLabel {
+  color: var(--amber-bright);
+  letter-spacing: .13em;
+}
+
+.profileCard strong {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 690;
+  line-height: 1.2;
+}
+
+.profileIdentityCard strong {
+  font-size: 16px;
+}
+
+.profileCard em {
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.profileBadge,
+.profileMutedBadge,
+.profileConnected {
+  border-radius: 10px;
+  min-height: 30px;
+}
+
+.profileBadge {
+  border-color: rgba(232, 181, 111, .28);
+  background: rgba(232, 181, 111, .09);
+  color: var(--amber-bright);
+}
+
+.profileConnected {
+  border-color: rgba(94, 212, 168, .26);
+  background: rgba(94, 212, 168, .1);
+  color: var(--ok);
+}
+
+.profileActionCard .ghostButton,
+.profileActionCard .primaryButton,
+.profileActionCard .dangerButton,
+.archiveRow .ghostButton,
+.archiveRow .primaryButton {
+  border-radius: 10px;
+  min-height: 34px;
+  white-space: nowrap;
+}
+
+.profileQuotaReadout {
+  align-items: end;
+  gap: 10px;
+}
+
+.profileQuotaReadout span {
+  color: var(--text-primary);
+  font-size: 36px;
+  font-weight: 360;
+  text-shadow: 0 0 28px rgba(232, 181, 111, .18);
+}
+
+.profileQuotaReadout small {
+  padding-bottom: 4px;
+}
+
+.profileMeter {
+  width: min(420px, 100%);
+  height: 9px;
+  border-color: rgba(174, 245, 255, .1);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, .03), transparent),
+    rgba(3, 9, 12, .82);
+}
+
+.profileMeter span {
+  background: linear-gradient(90deg, var(--amber-bright), rgba(94, 212, 168, .72));
+  box-shadow: 0 0 20px rgba(232, 181, 111, .2);
+}
+
+.profileSlotsCard .profileMeter span {
+  background: linear-gradient(90deg, var(--cyan), var(--ok));
+}
+
+.profileSlotsCard.full {
+  border-color: rgba(232, 181, 111, .28);
+  background:
+    radial-gradient(circle at 92% 6%, rgba(232, 181, 111, .09), transparent 32%),
+    linear-gradient(180deg, rgba(18, 28, 31, .88), rgba(7, 13, 17, .92));
+}
+
+.profileQuotaStatus {
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid rgba(94, 212, 168, .2);
+  border-radius: 999px;
+  background: rgba(94, 212, 168, .08);
+  color: var(--ok);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1.15;
+}
+
+.profileQuotaStatus.full {
+  border-color: rgba(232, 181, 111, .24);
+  background: rgba(232, 181, 111, .1);
+  color: var(--warn);
+}
+
+.profileSlotsCard.full .profileMeter span {
+  background: linear-gradient(90deg, var(--warn), rgba(255, 122, 122, .72));
+  box-shadow: 0 0 22px rgba(232, 181, 111, .22);
+}
+
+.packButtons {
+  align-content: end;
+  justify-content: end;
+  max-width: 320px;
+}
+
+.packButtons .primaryButton {
+  min-width: 76px;
+}
+
+.profileMutedBadge {
+  border-style: solid;
+  border-color: rgba(174, 245, 255, .12);
+  background: rgba(18, 32, 41, .58);
+}
+
+.profileArchives,
+.profileMailbox {
+  border-color: rgba(174, 245, 255, .12);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(174, 245, 255, .045), transparent 32%),
+    linear-gradient(180deg, rgba(9, 19, 24, .8), rgba(4, 10, 13, .86));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .03),
+    0 16px 38px rgba(0, 0, 0, .18);
+}
+
+.profileArchives .compactHeader,
+.profileMailbox .compactHeader {
+  border-bottom: 1px solid rgba(174, 245, 255, .065);
+}
+
+.profileArchives .compactHeader {
+  padding-bottom: 10px;
+}
+
+.profileMailbox .compactHeader {
+  padding: 13px 14px 10px;
+}
+
+.archiveRow {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  border-color: rgba(174, 245, 255, .1);
+  border-left-width: 1px;
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(232, 181, 111, .065), rgba(174, 245, 255, .022)),
+    rgba(7, 15, 19, .64);
+}
+
+.archiveRow strong {
+  color: var(--text-primary);
+}
+
+.archiveRow em,
+.archiveRow small {
+  color: var(--text-tertiary);
+}
+
+.profileMailbox {
+  min-height: clamp(380px, 46dvh, 650px);
+}
+
+.profileMessageList {
+  scrollbar-color: rgba(212, 149, 60, .32) transparent;
+  padding: 13px 14px;
+}
+
+.profileMessage {
+  max-width: min(80%, 720px);
+  border-color: rgba(174, 245, 255, .12);
+  border-left-width: 1px;
+  border-radius: 12px 12px 12px 5px;
+  background:
+    linear-gradient(90deg, rgba(174, 245, 255, .055), rgba(255, 255, 255, .01)),
+    rgba(8, 18, 24, .68);
+}
+
+.profileMessage.user {
+  border-left-width: 1px;
+  border-right: 1px solid rgba(232, 181, 111, .34);
+  border-radius: 12px 12px 5px 12px;
+  background:
+    linear-gradient(90deg, rgba(232, 181, 111, .1), rgba(232, 181, 111, .035)),
+    rgba(10, 15, 17, .76);
+}
+
+.profileMessage .messageMeta {
+  color: var(--amber-bright);
+}
+
+.profileMessage p {
+  color: var(--text-primary);
+  font-size: 12.8px;
+}
+
+.supportComposer {
+  grid-template-columns: minmax(0, 1fr) auto;
+  border-top-color: rgba(174, 245, 255, .08);
+  background: rgba(3, 9, 12, .82);
+}
+
+.supportComposer .adminTextarea {
+  border-radius: 12px;
+  min-height: 44px;
+  background:
+    radial-gradient(circle at 100% 50%, rgba(174, 245, 255, .04), transparent 34%),
+    rgba(3, 9, 12, .9);
+}
+
+.emptyPool {
+  justify-self: center;
+  align-self: center;
+  border-radius: 999px;
+  border-color: rgba(174, 245, 255, .14);
+  background: rgba(18, 32, 41, .42);
+}
+
+@media (max-width: 920px) {
+  .profileGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .profileIdentityCard,
+  .profileActionCard,
+  .profileHoursCard,
+  .profileSlotsCard,
+  .profileDangerCard {
+    grid-column: 1;
+  }
+
+  .profileHoursCard,
+  .profileSlotsCard {
+    grid-template-columns: 1fr;
+  }
+
+  .packButtons {
+    justify-content: start;
+  }
+}
+
+@media (max-width: 560px) {
+  .profileInline {
+    gap: 10px;
+  }
+
+  .profileCard {
+    padding: 10px;
+  }
+
+  .profileIdentityCard,
+  .profileActionCard {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .profileActionCard .ghostButton,
+  .profileActionCard .primaryButton,
+  .profileActionCard .dangerButton,
+  .profileConnected,
+  .profileMutedBadge {
+    align-self: stretch;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .profileQuotaReadout {
+    flex-wrap: wrap;
+  }
+
+  .profileQuotaReadout span {
+    font-size: 31px;
+  }
+
+  .archiveRow {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .archiveRow .ghostButton,
+  .archiveRow .primaryButton {
+    justify-content: center;
+  }
+
+  .profileMailbox {
+    min-height: 420px;
+  }
+
+  .profileMessage {
+    max-width: 94%;
+  }
+
+  .supportComposer {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================
+   LIKEABLE V2.6 - admin operations pass
+   ============================================ */
+.adminPanel {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(174, 245, 255, .075), transparent 32%),
+    linear-gradient(180deg, rgba(6, 14, 18, .98), rgba(3, 7, 10, .995));
+}
+
+.adminPanel .panelTitleRow {
+  max-width: 1280px;
+  align-items: center;
+}
+
+.adminPanel .panelTitleRow h2 {
+  color: var(--text-primary);
+  font-size: 26px;
+  font-weight: 720;
+  letter-spacing: 0;
+}
+
+.adminStack {
+  max-width: 1280px;
+  gap: 16px;
+}
+
+.adminCard {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  border-color: rgba(174, 245, 255, .11);
+  background:
+    radial-gradient(circle at 92% 0%, rgba(174, 245, 255, .045), transparent 32%),
+    linear-gradient(180deg, rgba(11, 23, 29, .9), rgba(5, 11, 14, .94));
+  box-shadow:
+    0 22px 58px rgba(0, 0, 0, .26),
+    inset 0 1px 0 rgba(255, 255, 255, .035);
+  padding: 16px;
+}
+
+.adminCard::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(174, 245, 255, .24), rgba(232, 181, 111, .22), transparent);
+  pointer-events: none;
+}
+
+.adminCardHeader {
+  gap: 5px;
+  margin-bottom: 15px;
+}
+
+.adminCardHeader h3 {
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 720;
+  letter-spacing: 0;
+}
+
+.adminCardHeader p {
+  color: var(--text-secondary);
+  font-size: 12.8px;
+}
+
+.adminStatus,
+.adminError {
+  border-radius: 10px;
+  min-height: 28px;
+  padding: 5px 9px;
+}
+
+.adminOpsGrid {
+  gap: 8px;
+}
+
+.adminOpsGrid > div,
+.customerMetric {
+  border-color: rgba(174, 245, 255, .1);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(174, 245, 255, .035), transparent 46%),
+    rgba(7, 16, 20, .72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
+}
+
+.adminOpsGrid strong {
+  color: var(--text-primary);
+  font-size: 30px;
+  font-weight: 360;
+}
+
+.customerMetric {
+  min-height: 72px;
+  padding: 10px;
+}
+
+.customerMetric span {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 760;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.customerMetric strong {
+  margin-top: 4px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 680;
+}
+
+.customerFilters,
+.configGrid {
+  gap: 9px;
+}
+
+.configLabel,
+.configGrid label,
+.poolRow label {
+  gap: 7px;
+}
+
+.configLabel > span:not(.configLabelText),
+.poolRow label > span,
+.noticeSeverityControl span,
+.adminProjectAssignment > span {
+  color: var(--amber-bright);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 820;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.configLabelText strong {
+  color: var(--text-secondary);
+}
+
+.configLabelText em {
+  color: var(--text-tertiary);
+}
+
+.configGrid input,
+.customerFilters input,
+.poolRow input,
+.adminTextarea,
+.adminSelect {
+  border-color: rgba(174, 245, 255, .105);
+  border-radius: 11px;
+  background:
+    linear-gradient(180deg, rgba(6, 14, 18, .86), rgba(3, 8, 11, .92)),
+    rgba(3, 8, 11, .92);
+}
+
+.configGrid input:focus,
+.customerFilters input:focus,
+.poolRow input:focus,
+.adminTextarea:focus,
+.adminSelect:focus {
+  border-color: rgba(232, 181, 111, .52);
+  box-shadow: 0 0 0 4px rgba(232, 181, 111, .08);
+}
+
+.customersLayout {
+  grid-template-columns: minmax(380px, .88fr) minmax(0, 1.12fr);
+  gap: 14px;
+}
+
+.customerList,
+.customerDetail,
+.moderationBox,
+.adminProjects,
+.adminMessageConsole {
+  border-color: rgba(174, 245, 255, .11);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 94% 8%, rgba(174, 245, 255, .035), transparent 32%),
+    rgba(3, 9, 12, .54);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
+}
+
+.customerList {
+  gap: 7px;
+  max-height: 690px;
+  scrollbar-color: rgba(212, 149, 60, .34) transparent;
+}
+
+.customerRow {
+  grid-template-columns: 38px minmax(0, 1fr) minmax(112px, auto);
+  min-height: 66px;
+  border-color: rgba(174, 245, 255, .1);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(174, 245, 255, .025), transparent 48%),
+    rgba(8, 18, 24, .62);
+  transition: border-color .14s ease, background .14s ease, transform .14s ease;
+}
+
+.customerRow .customerAvatar {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.customerRow .customerIdentity {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.customerRow .customerStats {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.customerRow .customerBadges {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+}
+
+.customerRow:hover,
+.customerRow:focus-visible {
+  border-color: rgba(232, 181, 111, .28);
+  background:
+    linear-gradient(90deg, rgba(232, 181, 111, .09), rgba(174, 245, 255, .025)),
+    rgba(10, 22, 28, .78);
+}
+
+.customerRow.selected {
+  border-color: rgba(232, 181, 111, .48);
+  background:
+    linear-gradient(90deg, rgba(232, 181, 111, .14), rgba(94, 212, 168, .035)),
+    rgba(10, 20, 26, .86);
+}
+
+.customerRow.restricted {
+  border-color: rgba(255, 122, 122, .34);
+}
+
+.customerAvatar {
+  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+}
+
+.customerStats {
+  justify-items: start;
+  max-width: 100%;
+}
+
+.customerStats b {
+  color: var(--amber-bright);
+}
+
+.customerStats small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customerBadges {
+  max-width: 170px;
+}
+
+.customerBadges i,
+.accessBadge {
+  min-width: 0;
+  overflow: hidden;
+  border-color: rgba(174, 245, 255, .12);
+  border-radius: 8px;
+  background: rgba(18, 32, 41, .58);
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customerBadges .assignmentBadge {
+  color: var(--amber-bright);
+}
+
+.paginationRow {
+  border-top: 1px solid rgba(174, 245, 255, .07);
+  margin-top: 3px;
+  padding-top: 9px;
+}
+
+.customerDetail {
+  gap: 11px;
+}
+
+.customerDetailHeader {
+  border-bottom: 1px solid rgba(174, 245, 255, .07);
+  padding-bottom: 10px;
+}
+
+.customerDetailHeader .eyebrow {
+  color: var(--amber-bright);
+}
+
+.moderationBox,
+.adminProjects {
+  padding: 11px;
+}
+
+.moderationBox {
+  gap: 8px;
+  padding: 10px;
+}
+
+.moderationBox .adminTextarea {
+  min-height: 78px;
+  max-height: 128px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.moderationBox .compactActions {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.adminMessageConsole {
+  grid-template-rows: auto minmax(260px, 430px) auto;
+  min-height: 0;
+  max-height: 620px;
+}
+
+.adminMessageConsole .compactHeader,
+.adminProjects .compactHeader {
+  border-bottom: 1px solid rgba(174, 245, 255, .07);
+  padding-bottom: 10px;
+}
+
+.customerDetail .adminNoticeList {
+  min-height: 260px;
+  max-height: 430px;
+  scrollbar-color: rgba(212, 149, 60, .32) transparent;
+}
+
+.adminNoticeBubble {
+  border-color: rgba(174, 245, 255, .12);
+  border-left-width: 1px;
+  border-radius: 12px 12px 12px 5px;
+  background:
+    linear-gradient(90deg, rgba(174, 245, 255, .055), rgba(255, 255, 255, .01)),
+    rgba(8, 18, 24, .68);
+}
+
+.adminNoticeBubble.outgoing {
+  border-left-width: 1px;
+  border-right: 1px solid rgba(232, 181, 111, .34);
+  border-radius: 12px 12px 5px 12px;
+  background:
+    linear-gradient(90deg, rgba(232, 181, 111, .1), rgba(232, 181, 111, .035)),
+    rgba(10, 15, 17, .76);
+}
+
+.adminNoticeComposer {
+  grid-template-columns: 136px minmax(0, 1fr) auto;
+  border-top-color: rgba(174, 245, 255, .08);
+  background: rgba(3, 9, 12, .82);
+}
+
+.unsendNoticeButton {
+  border-radius: 8px;
+  color: var(--text-secondary);
+}
+
+.adminProjectRow,
+.recoveryRow,
+.poolRow {
+  border-color: rgba(174, 245, 255, .11);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(174, 245, 255, .025), transparent 48%),
+    rgba(8, 18, 24, .64);
+}
+
+.adminProjectRow {
+  grid-template-columns: minmax(0, 1fr) minmax(240px, .8fr) auto;
+  padding: 10px;
+}
+
+.adminProjectActions .projectDelete,
+.smallIconButton {
+  border-radius: 10px;
+}
+
+.poolRows {
+  gap: 8px;
+}
+
+.poolRow {
+  grid-template-columns: minmax(120px, .7fr) minmax(160px, 1fr) minmax(160px, 1fr) minmax(128px, .72fr) minmax(170px, .86fr) auto 38px;
+  padding: 10px;
+}
+
+.poolRow.retiring,
+.poolRow.retired {
+  opacity: .62;
+}
+
+.poolStatLine {
+  color: var(--text-tertiary);
+}
+
+.recoveryRow.ready {
+  border-color: rgba(94, 212, 168, .28);
+  background:
+    linear-gradient(90deg, rgba(94, 212, 168, .09), rgba(174, 245, 255, .02)),
+    rgba(7, 18, 20, .68);
+}
+
+.recoveryRow.failed {
+  border-color: rgba(255, 122, 122, .34);
+  background:
+    linear-gradient(90deg, rgba(255, 122, 122, .075), rgba(232, 181, 111, .02)),
+    rgba(16, 12, 12, .68);
+}
+
+.emptyPool {
+  border-color: rgba(174, 245, 255, .14);
+  border-radius: 12px;
+  background: rgba(18, 32, 41, .38);
+}
+
+.adminSave {
+  position: sticky;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  z-index: 5;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, .34);
+}
+
+@media (max-width: 1100px) {
+  .customersLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .customerList {
+    max-height: 520px;
+  }
+}
+
+@media (max-width: 920px) {
+  .adminPanel {
+    padding-top: calc(64px + env(safe-area-inset-top));
+  }
+
+  .adminCardHeader.withAction,
+  .poolRow,
+  .adminProjectRow {
+    grid-template-columns: 1fr;
+  }
+
+  .customerFilters,
+  .adminOpsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .customerMetricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .adminPanel {
+    padding-right: max(10px, env(safe-area-inset-right));
+    padding-left: max(10px, env(safe-area-inset-left));
+  }
+
+  .adminCard {
+    border-radius: 14px;
+    padding: 12px;
+  }
+
+  .customerRow {
+    grid-template-columns: 36px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .customerStats,
+  .customerBadges {
+    grid-column: 2;
+    justify-items: start;
+    justify-content: flex-start;
+    max-width: 100%;
+  }
+
+  .customerMetricGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .adminNoticeComposer {
+    grid-template-columns: 1fr;
+  }
+
+  .adminNoticeComposer .noticeSendButton {
+    justify-self: stretch;
+    width: 100%;
+    font-size: 12px;
+    gap: 8px;
+  }
+
+  .noticeSeverityControl {
+    max-width: none;
+  }
+
+  .adminSave {
+    width: 100%;
   }
 }

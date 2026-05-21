@@ -49,6 +49,13 @@ Configure a GitHub OAuth App, not a GitHub App webhook:
 - Client ID: save in Admin as `github_client_id`.
 - Client secret: save in Admin as `github_client_secret`.
 
+For installations that should export without per-user OAuth, Admin can also store a shared export credential:
+
+- Username: save in Admin as `github_username`.
+- Personal access token: save in Admin as `github_token`. The token must be able to create repositories and push workflow files.
+
+The same fallback can also come from `GITHUB_USERNAME`/`GITHUB_TOKEN` or `GH_USERNAME`/`GH_TOKEN` environment variables when Admin config is empty.
+
 Do not configure repository webhooks for Likeable. There is no handler for GitHub `push`, `pull_request`, `workflow_run`, or installation events. The only inbound provider webhook currently handled by Likeable is Stripe at `/api/stripe/webhook`.
 
 To run the fully containerized app instead of the live-reload development server:

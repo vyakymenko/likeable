@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 )
 
@@ -15,6 +16,7 @@ type Client struct {
 	templateVersionID string
 	cliPath           string
 	cliDomain         string
+	runtimeChatURL    string
 	http              *http.Client
 }
 
@@ -46,7 +48,7 @@ func NewClient(config Config) (*Client, error) {
 	if apiKey == "" || agentID == "" {
 		return nil, errors.New("platform API key or agent ID is not configured")
 	}
-	cliPath := firstNonEmpty(config.CLIPath, "fibe")
+	cliPath := firstNonEmpty(config.CLIPath, os.Getenv("FIBE_CLI_PATH"), "fibe")
 	httpClient := config.HTTP
 	if httpClient == nil {
 		httpClient = http.DefaultClient

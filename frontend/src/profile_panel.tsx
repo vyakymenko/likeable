@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, Check, ExternalLink, FolderOpen, GitBranch, Loader2, LogOut, Send, Trash2, Wallet, X } from 'lucide-react';
+import { BookOpen, Check, CircleAlert, ExternalLink, FolderOpen, GitBranch, Loader2, LogOut, Send, Trash2, Wallet, X } from 'lucide-react';
 import { api } from './api';
 import { DeleteAllAccountDialog } from './builder_components';
 import type { Me, ProjectArchive, UserNotice } from './domain';
@@ -17,7 +17,7 @@ export function ProfilePanel({ me, onClose, onOpenTutorial }: { me: Me; onClose:
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
   const profileMessagesRef = useRef<HTMLDivElement | null>(null);
-  const orderedMessages = useMemo(() => [...messages].sort((left, right) => {
+  const orderedMessages = useMemo(() => messages.filter((message) => !isTransientProfileMessage(message, Date.now())).sort((left, right) => {
     const leftTime = Date.parse(left.createdAt);
     const rightTime = Date.parse(right.createdAt);
     if (Number.isNaN(leftTime) || Number.isNaN(rightTime)) return 0;
@@ -125,6 +125,7 @@ export function ProfilePanel({ me, onClose, onOpenTutorial }: { me: Me; onClose:
   const lifetimeHours = formatBillingDuration(quota?.lifetimeUsedMs ?? 0, resetCountdownLabels(t));
   const quotaUsedPercent = quota?.limitMs ? Math.min(100, Math.max(0, ((quota.usedMs ?? 0) / quota.limitMs) * 100)) : 0;
   const projectSlotPercent = projectQuota?.limit ? Math.min(100, Math.max(0, (projectQuota.used / projectQuota.limit) * 100)) : 0;
+  const projectSlotsFull = Boolean(projectQuota && projectQuota.used >= projectQuota.limit);
   return (
     <section className="inlinePanel profileInline">
       <div className="inlinePanelHeader">
@@ -186,12 +187,18 @@ export function ProfilePanel({ me, onClose, onOpenTutorial }: { me: Me; onClose:
           )}
           {availableHourPacks.length === 0 && <span className="profileMutedBadge">{t('profile.paidPacksUnavailable')}</span>}
         </div>
-        <div className="profileCard profileActionCard profileSlotsCard">
+        <div className={projectSlotsFull ? 'profileCard profileActionCard profileSlotsCard full' : 'profileCard profileActionCard profileSlotsCard'}>
           <div>
             <span className="profileLabel">{t('profile.projects')}</span>
             <strong>{projectQuota ? t('profile.projectSlots', { used: projectQuota.used, limit: projectQuota.limit }) : t('profile.projectQuota')}</strong>
+            {projectQuota && (
+              <span className={projectSlotsFull ? 'profileQuotaStatus full' : 'profileQuotaStatus'}>
+                {projectSlotsFull && <CircleAlert size={13} />}
+                {projectSlotsFull ? t('profile.projectSlotsFull') : t('profile.projectSlotsAvailable', { remaining: projectQuota.remaining })}
+              </span>
+            )}
             {projectQuota && <div className="profileMeter compact" aria-hidden="true"><span style={{ width: `${projectSlotPercent}%` }} /></div>}
-            <em>{t('profile.projectSlotDetail', { paid: projectQuota?.paidSlots ?? 0, reset: projectQuota?.nextExpiresAt ? ` · ${t('common.nextReset', { date: formatShortDate(projectQuota.nextExpiresAt, locale) })}` : '' })}</em>
+            <em>{projectSlotsFull ? t('profile.projectSlotFullDetail') : t('profile.projectSlotDetail', { paid: projectQuota?.paidSlots ?? 0, reset: projectQuota?.nextExpiresAt ? ` · ${t('common.nextReset', { date: formatShortDate(projectQuota.nextExpiresAt, locale) })}` : '' })}</em>
           </div>
           {projectQuotaPurchasable && (
             <button className="primaryButton" disabled={busyPack != null} onClick={() => void checkoutProjectSlot()}>
@@ -261,7 +268,7 @@ export function ProfilePanel({ me, onClose, onOpenTutorial }: { me: Me; onClose:
               {message.dismissedAt && <em>{t('profile.dismissed')}</em>}
             </div>
           ))}
-          {messages.length === 0 && <div className="emptyPool">{t('profile.noMessages')}</div>}
+          {orderedMessages.length === 0 && <div className="emptyPool">{t('profile.noMessages')}</div>}
         </div>
         <div className="supportComposer">
           <textarea className="adminTextarea compactTextarea" rows={1} value={supportBody} onChange={(event) => setSupportBody(event.target.value)} onKeyDown={handleSupportKeyDown} placeholder={t('profile.support.placeholder')} />
@@ -280,4 +287,15 @@ export function ProfilePanel({ me, onClose, onOpenTutorial }: { me: Me; onClose:
       )}
     </section>
   );
+}
+
+const PROFILE_TRANSIENT_NOTICE_TTL_MS = 10 * 60_000;
+
+function isTransientProfileMessage(message: UserNotice, now: number): boolean {
+  if (message.sender !== 'system') return false;
+  if (message.body.startsWith('Project quota:')) return true;
+  if (!message.body.startsWith('Project deletion started:')) return false;
+  if (message.dismissedAt) return true;
+  const created = Date.parse(message.createdAt);
+  return !Number.isNaN(created) && now - created > PROFILE_TRANSIENT_NOTICE_TTL_MS;
 }

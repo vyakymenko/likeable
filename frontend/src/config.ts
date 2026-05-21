@@ -15,7 +15,7 @@ export const ADMIN_CONFIG_SECTIONS = [
   {
     titleKey: 'admin.config.github.title',
     bodyKey: 'admin.config.github.body',
-    keys: ['github_client_id', 'github_client_secret']
+    keys: ['github_client_id', 'github_client_secret', 'github_username', 'github_token']
   },
   {
     titleKey: 'admin.config.google.title',

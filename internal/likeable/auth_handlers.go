@@ -32,14 +32,15 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	notices, _ := s.store.ActiveNoticesForUser(r.Context(), user.ID, 3)
+	notices, _ := s.store.ActiveNoticesForUser(r.Context(), user.ID, 10)
+	notices = activeShellNotices(notices, time.Now().UTC(), 3)
 	githubConnected := false
 	githubNeedsReconnect := false
-	if conn, err := s.store.SocialConnection(r.Context(), user.ID, "github"); err == nil {
-		githubConnected = true
-		githubNeedsReconnect = conn != nil && !githubScopeIncludes(conn.Scope, "workflow")
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		log.Printf("load github connection for user %s failed: %v", user.ID, err)
+	if _, connected, needsReconnect, err := s.githubExportConnection(r.Context(), user.ID); err == nil {
+		githubConnected = connected
+		githubNeedsReconnect = needsReconnect
+	} else {
+		log.Printf("load github export connection for user %s failed: %v", user.ID, err)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user":                 user,
@@ -51,6 +52,42 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		"billingProducts":      s.billingProducts(r.Context()),
 		"notices":              notices,
 	})
+}
+
+const projectDeletionShellNoticeTTL = 10 * time.Minute
+
+func activeShellNotices(notices []UserNotice, now time.Time, limit int) []UserNotice {
+	if limit <= 0 {
+		limit = 3
+	}
+	out := make([]UserNotice, 0, min(limit, len(notices)))
+	for _, notice := range notices {
+		if isTransientShellNotice(notice, now) {
+			continue
+		}
+		out = append(out, notice)
+		if len(out) >= limit {
+			break
+		}
+	}
+	if out == nil {
+		return []UserNotice{}
+	}
+	return out
+}
+
+func isTransientShellNotice(notice UserNotice, now time.Time) bool {
+	if notice.Sender == "system" && strings.HasPrefix(notice.Body, "Project quota:") {
+		return true
+	}
+	if !strings.HasPrefix(notice.Body, "Project deletion started:") {
+		return false
+	}
+	createdAt, err := time.Parse(time.RFC3339Nano, notice.CreatedAt)
+	if err != nil {
+		return false
+	}
+	return now.Sub(createdAt) > projectDeletionShellNoticeTTL
 }
 
 func (s *Server) googleConfigured(ctx context.Context) bool {

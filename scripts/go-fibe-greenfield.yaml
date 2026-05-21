@@ -1,0 +1,319 @@
+---
+x-fibe.gg:
+  metadata:
+    description: Go Fibe starter with a Go backend, React app frontend, React admin frontend, PostgreSQL, Redis caching, background jobs, rate limits, maintenance tasks, and iframe-ready security controls
+    category: Development
+  variables:
+    app_secret:
+      name: App secret
+      required: false
+      random: true
+    pgpassword:
+      name: Postgres password
+      required: false
+      random: true
+    app_subdomain:
+      name: App subdomain
+      required: false
+      default: go-fibe
+      validation: "/^(@|[a-z0-9]+(-[a-z0-9]+)*)$/"
+      path: services.app.labels.fibe.gg/subdomain
+    admin_subdomain:
+      name: Admin subdomain
+      required: false
+      default: go-fibe-admin
+      validation: "/^(@|[a-z0-9]+(-[a-z0-9]+)*)$/"
+      path: services.admin.labels.fibe.gg/subdomain
+    branch:
+      name: Git branch
+      required: false
+      default: main
+services:
+  postgres:
+    image: postgres:18.3-alpine
+    mem_limit: 160m
+    cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: 1m
+        max-file: "2"
+    security_opt:
+    - no-new-privileges:true
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    configs:
+    - source: postgres_config
+      target: /etc/postgresql/postgresql.conf
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: $$var__pgpassword
+      POSTGRES_DB: uptime_console
+    volumes:
+    - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U postgres -d uptime_console
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  redis:
+    image: redis:8.4-alpine
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru --save "" --appendonly no --tcp-keepalive 60 --hz 1
+    mem_limit: 96m
+    cpus: "0.10"
+    logging:
+      driver: json-file
+      options:
+        max-size: 1m
+        max-file: "2"
+    security_opt:
+    - no-new-privileges:true
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  setup:
+    image: ghcr.io/fibegg/go-fibe:dev-main
+    mem_limit: ${SETUP_MEM_LIMIT:-512m}
+    cpus: ${SETUP_CPUS:-0.50}
+    init: true
+    logging:
+      driver: json-file
+      options:
+        max-size: 1m
+        max-file: "2"
+    security_opt:
+    - no-new-privileges:true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: go-fibe setup
+    restart: "no"
+    environment:
+      APP_ENV: development
+      APP_SECRET: $$var__app_secret
+      DATABASE_URL: postgres://postgres:$$var__pgpassword@postgres:5432/uptime_console
+      REDIS_URL: redis://redis:6379/0
+      DB_MAX_CONNECTIONS: "2"
+      DB_MIN_CONNECTIONS: "0"
+      DB_ACQUIRE_TIMEOUT_MS: ${DB_ACQUIRE_TIMEOUT_MS:-1500}
+      PUBLIC_DEMO_PASSWORD: ${PUBLIC_DEMO_PASSWORD:-password}
+    labels:
+      fibe.gg/repo_url: https://github.com/fibegg/go-fibe
+      fibe.gg/branch: $$var__branch
+      fibe.gg/source_mount: /workspace
+      fibe.gg/production: "false"
+      fibe.gg/env_file: env.example
+  web:
+    image: ghcr.io/fibegg/go-fibe:dev-main
+    mem_limit: ${WEB_MEM_LIMIT:-512m}
+    cpus: ${WEB_CPUS:-0.75}
+    init: true
+    logging:
+      driver: json-file
+      options:
+        max-size: 1m
+        max-file: "2"
+    security_opt:
+    - no-new-privileges:true
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -c "mkdir -p tmp && air -c .air.web.toml"
+    environment:
+      APP_ENV: development
+      GOFLAGS: ${GOFLAGS:--mod=mod -buildvcs=false}
+      APP_PORT: ${APP_PORT:-3000}
+      APP_SECRET: $$var__app_secret
+      APP_ALLOWED_HOSTS: ${APP_ALLOWED_HOSTS:-*}
+      APP_PUBLIC_ORIGIN: ${APP_PUBLIC_ORIGIN:-}
+      APP_TRUST_PROXY_HEADERS: ${APP_TRUST_PROXY_HEADERS:-true}
+      APP_FORCE_HTTPS: ${APP_FORCE_HTTPS:-false}
+      APP_ASSUME_HTTPS: ${APP_ASSUME_HTTPS:-false}
+      APP_HSTS: ${APP_HSTS:-false}
+      APP_FRAME_ANCESTORS: "${APP_FRAME_ANCESTORS:-http://localhost:* http://127.0.0.1:* http://$$root_domain http://*.$$root_domain https://$$root_domain https://*.$$root_domain}"
+      APP_X_FRAME_OPTIONS: ${APP_X_FRAME_OPTIONS:-}
+      APP_CSP_MODE: ${APP_CSP_MODE:-off}
+      APP_CSP_CONNECT_SRC: ${APP_CSP_CONNECT_SRC:-}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-*}
+      APP_COOKIE_SECURE: ${APP_COOKIE_SECURE:-true}
+      APP_COOKIE_SAMESITE: ${APP_COOKIE_SAMESITE:-none}
+      APP_COOKIE_PARTITIONED: ${APP_COOKIE_PARTITIONED:-true}
+      APP_ALLOW_PRIVATE_MONITOR_URLS: ${APP_ALLOW_PRIVATE_MONITOR_URLS:-false}
+      DATABASE_URL: postgres://postgres:$$var__pgpassword@postgres:5432/uptime_console
+      REDIS_URL: redis://redis:6379/0
+      DB_MAX_CONNECTIONS: ${DB_MAX_CONNECTIONS:-5}
+      DB_MIN_CONNECTIONS: ${DB_MIN_CONNECTIONS:-0}
+      DB_ACQUIRE_TIMEOUT_MS: ${DB_ACQUIRE_TIMEOUT_MS:-1500}
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://127.0.0.1:3000/up >/dev/null
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    labels:
+      fibe.gg/repo_url: https://github.com/fibegg/go-fibe
+      fibe.gg/branch: $$var__branch
+      fibe.gg/source_mount: /workspace
+      fibe.gg/production: "false"
+      fibe.gg/env_file: env.example
+  worker:
+    image: ghcr.io/fibegg/go-fibe:dev-main
+    mem_limit: ${WORKER_MEM_LIMIT:-512m}
+    cpus: ${WORKER_CPUS:-0.75}
+    init: true
+    logging:
+      driver: json-file
+      options:
+        max-size: 1m
+        max-file: "2"
+    security_opt:
+    - no-new-privileges:true
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -c "mkdir -p tmp && air -c .air.worker.toml"
+    environment:
+      APP_ENV: development
+      GOFLAGS: ${GOFLAGS:--mod=mod -buildvcs=false}
+      APP_SECRET: $$var__app_secret
+      APP_ALLOW_PRIVATE_MONITOR_URLS: ${APP_ALLOW_PRIVATE_MONITOR_URLS:-false}
+      DATABASE_URL: postgres://postgres:$$var__pgpassword@postgres:5432/uptime_console
+      REDIS_URL: redis://redis:6379/0
+      DB_MAX_CONNECTIONS: ${WORKER_DB_MAX_CONNECTIONS:-3}
+      DB_MIN_CONNECTIONS: ${DB_MIN_CONNECTIONS:-0}
+      DB_ACQUIRE_TIMEOUT_MS: ${DB_ACQUIRE_TIMEOUT_MS:-1500}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      MONITOR_CHECK_INTERVAL_SECONDS: ${MONITOR_CHECK_INTERVAL_SECONDS:-30}
+    labels:
+      fibe.gg/repo_url: https://github.com/fibegg/go-fibe
+      fibe.gg/branch: $$var__branch
+      fibe.gg/source_mount: /workspace
+      fibe.gg/production: "false"
+      fibe.gg/env_file: env.example
+  app:
+    image: ghcr.io/fibegg/go-fibe-app:dev-main
+    mem_limit: ${APP_MEM_LIMIT:-384m}
+    cpus: ${APP_CPUS:-0.35}
+    init: true
+    logging:
+      driver: json-file
+      options:
+        max-size: 1m
+        max-file: "2"
+    security_opt:
+    - no-new-privileges:true
+    depends_on:
+      web:
+        condition: service_started
+    command: sh -c "if [ ! -x node_modules/.bin/vite ]; then mkdir -p node_modules && cp -a /opt/node_modules/. node_modules/ 2>/dev/null || true; fi; if [ ! -x node_modules/.bin/vite ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then npm ci --prefer-offline --no-audit --no-fund; fi; npm run dev"
+    environment:
+      VITE_API_ORIGIN: ${VITE_API_ORIGIN:-http://web:3000}
+      VITE_ALLOWED_HOSTS: ${VITE_ALLOWED_HOSTS:-${APP_SUBDOMAIN}.$$root_domain}
+      VITE_HMR_HOST: ${VITE_HMR_HOST:-${APP_SUBDOMAIN}.$$root_domain}
+      VITE_USE_POLLING: ${VITE_USE_POLLING:-false}
+      NPM_CONFIG_AUDIT: "false"
+      NPM_CONFIG_FUND: "false"
+    volumes:
+    - app_node_modules:/workspace/node_modules
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - node -e "fetch('http://127.0.0.1:5173').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    labels:
+      fibe.gg/repo_url: https://github.com/fibegg/go-fibe-app
+      fibe.gg/expose: external:5173
+      fibe.gg/branch: $$var__branch
+      fibe.gg/source_mount: /workspace
+      fibe.gg/production: "false"
+      fibe.gg/env_file: env.example
+      fibe.gg/subdomain: go-fibe
+      fibe.gg/zerodowntime: "true"
+  admin:
+    image: ghcr.io/fibegg/go-fibe-admin:dev-main
+    mem_limit: ${ADMIN_MEM_LIMIT:-384m}
+    cpus: ${ADMIN_CPUS:-0.35}
+    init: true
+    logging:
+      driver: json-file
+      options:
+        max-size: 1m
+        max-file: "2"
+    security_opt:
+    - no-new-privileges:true
+    depends_on:
+      web:
+        condition: service_started
+    command: sh -c "if [ ! -x node_modules/.bin/vite ]; then mkdir -p node_modules && cp -a /opt/node_modules/. node_modules/ 2>/dev/null || true; fi; if [ ! -x node_modules/.bin/vite ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then npm ci --prefer-offline --no-audit --no-fund; fi; npm run dev"
+    environment:
+      VITE_API_ORIGIN: ${VITE_API_ORIGIN:-http://web:3000}
+      VITE_ALLOWED_HOSTS: ${VITE_ALLOWED_HOSTS:-${ADMIN_SUBDOMAIN}.$$root_domain}
+      VITE_HMR_HOST: ${VITE_HMR_HOST:-${ADMIN_SUBDOMAIN}.$$root_domain}
+      VITE_USE_POLLING: ${VITE_USE_POLLING:-false}
+      NPM_CONFIG_AUDIT: "false"
+      NPM_CONFIG_FUND: "false"
+    volumes:
+    - admin_node_modules:/workspace/node_modules
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - node -e "fetch('http://127.0.0.1:5173').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    labels:
+      fibe.gg/repo_url: https://github.com/fibegg/go-fibe-admin
+      fibe.gg/expose: external:5173
+      fibe.gg/branch: $$var__branch
+      fibe.gg/source_mount: /workspace
+      fibe.gg/production: "false"
+      fibe.gg/env_file: env.example
+      fibe.gg/subdomain: go-fibe-admin
+      fibe.gg/zerodowntime: "true"
+volumes:
+  postgres_data:
+  app_node_modules:
+  admin_node_modules:
+configs:
+  postgres_config:
+    content: |
+      listen_addresses = '*'
+      max_connections = 20
+      shared_buffers = 32MB
+      effective_cache_size = 128MB
+      work_mem = 1MB
+      maintenance_work_mem = 16MB
+      wal_buffers = 1MB
+      min_wal_size = 32MB
+      max_wal_size = 128MB
+      max_worker_processes = 2
+      max_parallel_workers = 1
+      max_parallel_workers_per_gather = 0
+      max_parallel_maintenance_workers = 1
+      jit = off
+      fsync = on
+      synchronous_commit = on

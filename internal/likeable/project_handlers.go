@@ -160,6 +160,8 @@ func (s *Server) handleProjectRoute(w http.ResponseWriter, r *http.Request) {
 	switch parts[1] {
 	case "messages":
 		s.handleProjectMessages(w, r, user, project)
+	case "prompt-improve":
+		s.handleProjectPromptImprove(w, r, user, project)
 	case "feed":
 		s.handleProjectFeed(w, r, user, project)
 	case "preview-status":
@@ -342,8 +344,7 @@ func (s *Server) controlProjectPlayground(ctx context.Context, user *User, proje
 		return nil, errInvalidPlaygroundAction
 	}
 	if err != nil {
-		s.observePlatformError(err)
-		if action == "stop" && fibegateway.IsPlaygroundAlreadyStoppedError(err) {
+		if action == "stop" && (fibegateway.IsPlaygroundAlreadyStoppedError(err) || fibegateway.IsPlaygroundMissingError(err)) {
 			if updateErr := s.store.UpdateProjectStatus(ctx, project.ID, user.ID, "stopped"); updateErr != nil {
 				return nil, updateErr
 			}
@@ -352,6 +353,7 @@ func (s *Server) controlProjectPlayground(ctx context.Context, user *User, proje
 			}
 			return s.store.ProjectForUser(ctx, user.ID, project.ID)
 		}
+		s.observePlatformError(err)
 		return nil, err
 	}
 	if err := s.store.UpdateProjectStatus(ctx, project.ID, user.ID, nextStatus); err != nil {
